@@ -25,7 +25,7 @@ module.exports = {
                 }
 
                 const githubLink = "frok tor oikhan diya ber kobo amar boss e";
-                const youtubeLink = "ouTube install de age,,, halar po";
+                const youtubeLink = "youTube install de age,,, halar po";
 
                 const response = `✓ | Fork this project here:\n` +
                                  `•${githubLink}\n\n` +
