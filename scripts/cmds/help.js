@@ -1,134 +1,194 @@
+const axios = require("axios");
 const { getPrefix } = global.utils;
 const { commands, aliases } = global.GoatBot;
 
-module.exports = {
-        config: {
-                name: "help",
-                version: "1.7",
-                author: "MahMUD",
-                countDown: 5,
-                role: 0,
-                shortDescription: {
-                        en: "View command usage and list all commands",
-                        bn: "কমান্ড ব্যবহারের নিয়ম এবং তালিকা দেখুন",
-                        vi: "Xem cách sử dụng và danh sách lệnh"
-                },
-                longDescription: {
-                        en: "View command usage and list all commands directly",
-                        bn: "কমান্ড ব্যবহারের নিয়ম এবং তালিকা দেখুন",
-                        vi: "Xem cách sử dụng và danh sách lệnh"
-                },
-                category: "info",
-                guide: {
-                        en: "{pn} [command name]",
-                        bn: "{pn} [কমান্ডের নাম]",
-                        vi: "{pn} [tên lệnh]"
-                },
-                priority: 1,
-        },
+let xfont = null;
+let yfont = null;
+let categoryEmoji = null;
 
-        onStart: async function ({ message, args, event, threadsData, role }) {
-                const { threadID } = event;
-                const threadData = await threadsData.get(threadID);
-                const prefix = getPrefix(threadID);
-                const langCode = threadData.data.lang || global.GoatBot.config.language || "en";
-
-                if (args.length === 0) {
-                        const categories = {};
-                        let msg = "";
-
-                        for (const [name, value] of commands) {
-                                if (value.config.role > 0 && role < value.config.role) continue;
-                                
-                                const category = value.config.category || "Uncategorized";
-                                categories[category] = categories[category] || { commands: [] };
-                                if (!categories[category].commands.includes(name)) {
-                                        categories[category].commands.push(name);
-                                }
-                        }
-
-                        Object.keys(categories).sort().forEach((category) => {
-                                msg += `\n╭─────⭓ ${category.toUpperCase()}`;
-                                const names = categories[category].commands.sort();
-                                for (let i = 0; i < names.length; i += 3) {
-                                        const cmds = names.slice(i, i + 3).map((item) => `✧${item}`);
-                                        msg += `\n│ ${cmds.join("  ")}`;
-                                }
-                                msg += `\n╰────────────⭓\n`;
-                        });
-
-                        const totalCommands = commands.size;
-                        let helpHint = langCode === "bn" ? `বিস্তারিত দেখতে ${prefix}help <কমান্ড> লিখুন।` : 
-                                       langCode === "vi" ? `Nhập ${prefix}help <lệnh> để xem chi tiết.` : 
-                                       `Type ${prefix}help <cmd> to see details.`;
-
-                        msg += `\n\n⭔ Total Commands: ${totalCommands}\n⭔ ${helpHint}\n`;
-                        msg += `\n╭─✦ ADMIN: Protik 彡\n├‣ WHATSAPP\n╰‣ 01613828497`;
-
-                        try {
-                                const hh = await message.reply({ body: msg });
-                                setTimeout(() => message.unsend(hh.messageID), 80000);
-                        } catch (error) {
-                                console.error("Help Error:", error);
-                        }
-
-                } else {
-                        const commandName = args[0].toLowerCase();
-                        const command = commands.get(commandName) || commands.get(aliases.get(commandName));
-
-                        if (!command) {
-                                const notFound = langCode === "bn" ? `❌ | বেবি, "${commandName}" নামে কোনো কমান্ড নেই!` : 
-                                                 langCode === "vi" ? `❌ | Không tìm thấy lệnh "${commandName}".` : 
-                                                 `❌ | Command "${commandName}" not found.`;
-                                return message.reply(notFound);
-                        }
-
-                        const config = command.config;
-                        const roleText = roleTextToString(config.role, langCode);
-
-                        const labels = {
-                                bn: { name: "নাম", alias: "ডাকনাম", info: "তথ্য", desc: "বর্ণনা", author: "লেখক", guide: "নির্দেশনা", usage: "ভার্সন ও পারমিশন", ver: "ভার্সন", role: "অনুমতি", none: "নেই", unknown: "অজানা" },
-                                vi: { name: "Tên", alias: "Tên khác", info: "Thông tin", desc: "Mô tả", author: "Tác giả", guide: "Hướng dẫn", usage: "Phiên bản & Quyền", ver: "Phiên bản", role: "Quyền hạn", none: "Không có", unknown: "Không xác định" },
-                                en: { name: "NAME", alias: "Aliases", info: "INFO", desc: "Description", author: "Author", guide: "Guide", usage: "Details", ver: "Version", role: "Role", none: "None", unknown: "Unknown" }
-                        };
-
-                        const lb = labels[langCode] || labels.en;
-                        const desc = config.description?.[langCode] || config.description?.en || config.longDescription?.[langCode] || config.longDescription?.en || "No description";
-                        const guideBody = config.guide?.[langCode] || config.guide?.en || "";
-                        
-                        const usage = guideBody
-                                .replace(/{pn}/g, prefix + config.name)
-                                .replace(/{p}/g, prefix)
-                                .replace(/{n}/g, config.name);
-
-                        const response = `╭─────────⭓\n` +
-                                         `│ 🎀 ${lb.name}: ${config.name}\n` +
-                                         `│ 📃 ${lb.alias}: ${config.aliases ? config.aliases.join(", ") : lb.none}\n` +
-                                         `├──‣ ${lb.info}\n` +
-                                         `│ 📝 ${lb.desc}: ${desc}\n` +
-                                         `│ 👑 ${lb.author}: ${config.author || lb.unknown}\n` +
-                                         `│ 📚 ${lb.guide}: ${usage || prefix + config.name}\n` +
-                                         `├──‣ ${lb.usage}\n` +
-                                         `│ ⭐ ${lb.ver}: ${config.version || "1.0"}\n` +
-                                         `│ ♻️ ${lb.role}: ${roleText}\n` +
-                                         `╰────────────⭓`;
-
-                        const helpMessage = await message.reply(response);
-                        setTimeout(() => message.unsend(helpMessage.messageID), 80000);
-                }
-        }
-};
-
-function roleTextToString(role, lang) {
-        const roles = {
-                bn: ["সব ইউজার", "গ্রুপ অ্যাডমিন", "বোট অ্যাডমিন", "ডেভেলপার (Dev)", "ভিআইপি (VIP)", "NSFW ইউজার"],
-                en: ["All users", "Group Admin", "Bot Admin", "Developer", "VIP User", "NSFW User"],
-                vi: ["Tất cả người dùng", "Quản trị viên nhóm", "Admin bot", "Người phát triển", "Người dùng VIP", "Người dùng NSFW"]
-        };
-
-        const r = roles[lang] || roles.en;
-        if (role >= 0 && role <= 5) {
-                return `${role} (${r[role]})`;
-        }
-        return `${role} (Unknown)`;
+async function loadResources() {
+ try {
+ const [catRes, cmdRes, emojiRes] = await Promise.all([
+ axios.get("https://raw.githubusercontent.com/Saim-x69x/sakura/main/xfont.json"),
+ axios.get("https://raw.githubusercontent.com/Saim-x69x/sakura/main/yfont.json"),
+ axios.get("https://raw.githubusercontent.com/Saim-x69x/sakura/main/category.json")
+ ]);
+ xfont = catRes.data;
+ yfont = cmdRes.data;
+ categoryEmoji = emojiRes.data;
+ } catch (err) {}
 }
+
+function fontConvert(text, type = "command") {
+ const fontMap = type === "category" ? xfont : yfont;
+ if (!fontMap) return text;
+ return text.split("").map(ch => fontMap[ch] || ch).join("");
+}
+
+function getCategoryEmoji(cat) {
+ return categoryEmoji?.[cat.toLowerCase()] || "🗂️";
+}
+
+function levenshteinDistance(a, b) {
+ const matrix = Array(b.length + 1).fill(0).map(() => Array(a.length + 1).fill(0));
+ for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+ for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+ for (let j = 1; j <= b.length; j++) {
+ for (let i = 1; i <= a.length; i++) {
+ const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+ matrix[j][i] = Math.min(
+ matrix[j][i - 1] + 1,
+ matrix[j - 1][i] + 1,
+ matrix[j - 1][i - 1] + cost
+ );
+ }
+ }
+ return matrix[b.length][a.length];
+}
+
+function getClosestCommand(name) {
+ const lower = name.toLowerCase();
+ let best = null, dist = Infinity;
+ for (const cmd of commands.keys()) {
+ const d = levenshteinDistance(lower, cmd.toLowerCase());
+ if (d < dist) {
+ dist = d;
+ best = cmd;
+ }
+ }
+ return dist <= 3 ? best : null;
+}
+
+function roleTextToString(role) {
+ switch (role) {
+ case 0: return "All Users";
+ case 1: return "Group Admins";
+ case 2: return "VIP Users";
+ case 3: return "Bot Admin";
+ case 4: return "Bot Creator";
+ default: return "Unknown";
+ }
+}
+
+module.exports = {
+ config: {
+ name: "help",
+ aliases: "menu",
+ version: "2.0",
+ author: "Protik",
+ countDown: 5,
+ role: 0,
+ shortDescription: { en: "Shows all commands or details." },
+ longDescription: { en: "Display categories, command lists or specific command info." },
+ category: "info",
+ guide: { en: "{pn}, {pn} [command], {pn} -c [category]" }
+ },
+
+ onStart: async function ({ message, args, event, role }) {
+ const prefix = getPrefix(event.threadID);
+
+ if (!xfont || !yfont || !categoryEmoji) await loadResources();
+
+ const categories = {};
+ for (const [name, cmd] of commands) {
+ if (!cmd?.config || typeof cmd.onStart !== "function") continue;
+ if (cmd.config.role > role) continue;
+ const cat = (cmd.config.category || "UNCATEGORIZED").toUpperCase();
+ if (!categories[cat]) categories[cat] = [];
+ categories[cat].push(name);
+ }
+
+ const helpImage = "https://files.catbox.moe/uoljwh.mp4";
+ const input = args.join(" ").trim();
+
+ if (args[0] === "-c" && args[1]) {
+ const categoryName = args[1].toUpperCase();
+ if (!categories[categoryName]) {
+ return message.reply(`❌ Category "${categoryName}" not found.`);
+ }
+
+ const emoji = getCategoryEmoji(categoryName);
+ const list = categories[categoryName];
+ const total = list.length;
+
+ let msg = "";
+ msg += "━━━━━━━━━━━━━━\n";
+ msg += `𝐂𝐀𝐓𝐄𝐆𝐎𝐑𝐘: ${emoji} | ${fontConvert(categoryName, "category")}\n`;
+ msg += "╭──────୨ৎ──────╮\n";
+
+ for (const cmd of list.sort()) {
+ msg += `╎ ᯓ✧. ${fontConvert(cmd, "command")}\n`;
+ }
+
+ msg += "┕━─────୨ৎ─────━ᥫ᭡\n";
+ msg += "• 𝙽𝚎𝚎𝚍 𝚑𝚎𝚕𝚙 𝚠𝚒𝚝𝚑 𝚊 𝚌𝚘𝚖𝚖𝚊𝚗𝚍? 𝚄𝚜𝚎 /𝚑𝚎𝚕𝚙 <𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚗𝚊𝚖𝚎>.\n";
+ msg += "╭──────୨ৎ──────╮\n";
+ msg += `╎ 🔢 𝐓𝐨𝐭𝐚𝐥 𝐂𝐨𝐦𝐦𝐚𝐧𝐝𝐬: ${total}\n`;
+ msg += `╎ ⚡️ 𝐏𝐫𝐞𝐟𝐢𝐱: ${prefix}\n`;
+ msg += "╎ 👤 𝐂𝐫𝐞𝐚𝐭𝐨𝐫: Protik\n";
+ msg += "╰──────୨ৎ──────╯";
+
+ return message.reply({
+ body: msg,
+ attachment: await global.utils.getStreamFromURL(helpImage)
+ });
+ }
+
+ if (!input) {
+ let msg = "";
+ msg += "━━━━━━━━━━━━━━\n";
+ msg += "𝙰𝚟𝚊𝚒𝚕𝚊𝚋𝚕𝚎 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚜:\n";
+ msg += "━━━━━━━━━━━━━━\n";
+
+ for (const cat of Object.keys(categories).sort()) {
+ msg += `┍─━〔 ${getCategoryEmoji(cat)} | ${fontConvert(cat, "category")} 〕\n`;
+ for (const cmd of categories[cat].sort()) {
+ msg += `╎ᯓ✧. ${fontConvert(cmd, "command")}\n`;
+ }
+ msg += "┕━─────୨ৎ─────━ᥫ᭡\n";
+ }
+
+ msg += "• 𝙽𝚎𝚎𝚍 𝚑𝚎𝚕𝚙 𝚠𝚒𝚝𝚑 𝚊 𝚌𝚘𝚖𝚖𝚊𝚗𝚍? 𝚄𝚜𝚎 /𝚑𝚎𝚕𝚙 <𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚗𝚊𝚖𝚎>.\n";
+ msg += "╭──────୨ৎ──────╮\n";
+ msg += `╎ 🔢 𝐓𝐨𝐭𝐚𝐥 𝐂𝐨𝐦𝐦𝐚𝐧𝐝𝐬: ${commands.size}\n`;
+ msg += `╎ ⚡️ 𝐏𝐫𝐞𝐟𝐢𝐱: ${prefix}\n`;
+ msg += "╎ 👤 𝐂𝐫𝐞𝐚𝐭𝐨𝐫: 𝐑𝐎𝐂𝐊𝐘\n";
+ msg += "╰──────୨ৎ──────╯";
+
+ return message.reply({
+ body: msg,
+ attachment: await global.utils.getStreamFromURL(helpImage)
+ });
+ }
+
+ const cmdName = input.toLowerCase();
+ const cmd = commands.get(cmdName) || commands.get(aliases.get(cmdName));
+
+ if (!cmd || !cmd.config) {
+ const suggestion = getClosestCommand(cmdName);
+ return message.reply(
+ suggestion
+ ? `❌ Command "${cmdName}" not found.\n👉 Maybe you meant: ${suggestion}`
+ : `❌ Command "${cmdName}" not found.`
+ );
+ }
+
+ const c = cmd.config;
+ const usage = c.guide?.en?.replace(/{pn}/g, `${prefix}${c.name}`) || "No usage.";
+
+ const msg = `
+╭═══ [ 𝘊𝘖𝘔𝘔𝘈𝘕𝘋 𝘐𝘕𝘍𝘖 ] ═══╮
+╎🧩 Name : ${c.name}
+╎📦 Category : ${(c.category || "UNCATEGORIZED").toUpperCase()}
+╎📜 Description: ${c.longDescription?.en || "No description."}
+╎🔁 Aliases : ${c.aliases ? c.aliases.join(", ") : "None"}
+╎⚙️ Version : ${c.version || "1.0"}
+╎🔐 Permission : ${c.role} (${roleTextToString(c.role)})
+╎⏱️ Cooldown : ${c.countDown || 5}s
+╎👑 Author : ${c.author || "Unknown"}
+╎📖 Usage : ${usage}
+╰═════════୨ৎ═════════╯`;
+
+ return message.reply(msg);
+ }
+};
