@@ -1,59 +1,37 @@
-module.exports.config = {
-  name: "bet",
-  version: "3.0",
-  author: "MOHAMMAD AKASH",
-  role: 0,
-  category: "economy",
-  shortDescription: "Casino betting game"
-};
+module.exports = {
+  config: {
+    name: "bet",
+    version: "1.0",
+    author: "Protik / Assistant",
+    countDown: 3,
+    role: 0,
+    shortDescription: { en: "Quick 50/50 Betting Game" },
+    category: "games",
+    guide: { en: "{pn} [amount]" }
+  },
 
-module.exports.onStart = async function ({ api, event, args, usersData }) {
-  const { senderID, threadID, messageID } = event;
+  onStart: async function ({ message, args, event, usersData }) {
+    const { senderID } = event;
+    const bet = parseInt(args[0]);
 
-  if (!args[0])
-    return api.sendMessage("🎰 Usage: bet <amount>", threadID, messageID);
+    if (isNaN(bet) || bet <= 0) return message.reply("❌ | সঠিক ব্যবহারের নিয়ম: !bet [amount]");
+    if (bet > 10000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $10,000,000 (10M)!");
 
-  const bet = parseInt(args[0]);
-  if (!bet || bet <= 0)
-    return api.sendMessage("❌ Invalid bet amount!", threadID, messageID);
+    let userData = await usersData.get(senderID);
+    let money = (userData.data && userData.data.money !== undefined) ? userData.data.money : 10000000;
 
-  const userData = await usersData.get(senderID);
-  let balance = userData?.data?.money ?? 100;
+    if (money < bet) return message.reply("❌ | Not enough balance!");
 
-  if (balance < bet)
-    return api.sendMessage(`❌ Not enough balance!\n🏦 Balance: ${balance}$`, threadID, messageID);
+    const isWin = Math.random() < 0.5;
 
-  const outcomes = [
-    { text: "💥 You lost everything!", multiplier: 0 },
-    { text: "😞 You got back half.", multiplier: 0.5 },
-    { text: "🟡 You broke even.", multiplier: 1 },
-    { text: "🟢 You doubled your money!", multiplier: 2 },
-    { text: "🔥 You tripled your bet!", multiplier: 3 },
-    { text: "🎉 JACKPOT! 10x reward!", multiplier: 10 }
-  ];
-
-  const win = Math.random() < 0.6;
-  let selected;
-
-  if (win) {
-    const winOutcomes = outcomes.filter(o => o.multiplier > 0);
-    selected = winOutcomes[Math.floor(Math.random() * winOutcomes.length)];
-  } else {
-    const loseOutcomes = outcomes.filter(o => o.multiplier === 0);
-    selected = loseOutcomes[Math.floor(Math.random() * loseOutcomes.length)];
+    if (isWin) {
+      let newBal = money + bet;
+      await usersData.set(senderID, { money: newBal });
+      return message.reply(`💥 YOU WON THE BET!\n🎰 You bet: $${bet.toLocaleString()}\n💰 You won: $${bet.toLocaleString()}\n💵 New balance: $${newBal.toLocaleString()}`);
+    } else {
+      let newBal = money - bet;
+      await usersData.set(senderID, { money: newBal });
+      return message.reply(`💥 You lost everything!\n🎰 You bet: $${bet.toLocaleString()}\n💸 You won: $0\n💵 New balance: $${newBal.toLocaleString()}`);
+    }
   }
-
-  const reward = Math.floor(bet * selected.multiplier);
-  balance = balance - bet + reward;
-
-  await usersData.set(senderID, { data: { ...userData.data, money: balance } });
-
-  const msg =
-`${selected.text}
-
-🎰 You bet: ${bet}$
-💸 You won: ${reward}$
-💰 New balance: ${balance}$`;
-
-  api.sendMessage(msg, threadID, messageID);
 };
