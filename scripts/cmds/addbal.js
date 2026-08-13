@@ -2,10 +2,10 @@ module.exports = {
   config: {
     name: "addbal",
     aliases: ["deposit", "addmoney"],
-    version: "1.0",
+    version: "1.1",
     author: "Protik / Assistant",
     countDown: 2,
-    role: 2, // শুধু বটের অ্যাডমিন ব্যবহার করতে পারবে
+    role: 2, // Admin only
     shortDescription: { en: "Deposit money to user account" },
     category: "economy",
     guide: { en: "{pn} [Amount] (reply/mention user)" }
@@ -20,7 +20,7 @@ module.exports = {
       amount = parseInt(args[0]);
     } else if (Object.keys(event.mentions).length > 0) {
       targetID = Object.keys(event.mentions)[0];
-      amount = parseInt(args[1]);
+      amount = parseInt(args[args.length - 1]);
     } else {
       return message.reply("❌ | মামা, কাউকে রিপ্লাই দিয়ে বা মেনশন করে টাকার পরিমাণ লেখো!");
     }
@@ -30,10 +30,13 @@ module.exports = {
     }
 
     let userData = await usersData.get(targetID);
-    let currentMoney = (userData.data && userData.data.money !== undefined) ? userData.data.money : 10000000;
+    let uData = userData.data || {};
+    let currentMoney = uData.money !== undefined ? uData.money : 10000000;
     
     let newBalance = currentMoney + amount;
-    await usersData.set(targetID, { money: newBalance });
+    uData.money = newBalance;
+
+    await usersData.set(targetID, { data: uData });
 
     return message.reply(`✅ | সফলভাবে $${amount.toLocaleString()} ডিপোজিট করা হয়েছে!\n💰 নতুন ব্যালেন্স: $${newBalance.toLocaleString()}`);
   }
