@@ -2,7 +2,7 @@ module.exports = {
   config: {
     name: "slot",
     aliases: ["slots"],
-    version: "1.0",
+    version: "1.1",
     author: "Protik / Assistant",
     countDown: 3,
     role: 0,
@@ -19,7 +19,8 @@ module.exports = {
     if (bet > 10000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $10,000,000 (10M)!");
 
     let userData = await usersData.get(senderID);
-    let money = (userData.data && userData.data.money !== undefined) ? userData.data.money : 10000000;
+    let uData = userData.data || {};
+    let money = uData.money !== undefined ? uData.money : 10000000;
 
     if (money < bet) return message.reply("❌ | পর্যাপ্ত ব্যালেন্স নেই!");
 
@@ -29,17 +30,19 @@ module.exports = {
     const slot3 = icons[Math.floor(Math.random() * icons.length)];
 
     let winMultiplier = 0;
-    if (slot1 === slot2 && slot2 === slot3) winMultiplier = 3; // Triple match (3x)
-    else if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) winMultiplier = 1.5; // Double match (1.5x)
+    if (slot1 === slot2 && slot2 === slot3) winMultiplier = 3; 
+    else if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) winMultiplier = 1.5; 
 
     if (winMultiplier > 0) {
       let prize = Math.floor(bet * winMultiplier);
       let newBal = money + prize;
-      await usersData.set(senderID, { money: newBal });
+      uData.money = newBal;
+      await usersData.set(senderID, { data: uData });
       return message.reply(`🎰 SLOT MACHINE 🎰\n━━━━━━━━━━━━━━━\n[ ${slot1} | ${slot2} | ${slot3} ]\n━━━━━━━━━━━━━━━\n🎉 JACKPOT/WIN!\n💰 +$${prize.toLocaleString()}\n💵 Balance: $${newBal.toLocaleString()}`);
     } else {
       let newBal = money - bet;
-      await usersData.set(senderID, { money: newBal });
+      uData.money = newBal;
+      await usersData.set(senderID, { data: uData });
       return message.reply(`🎰 SLOT MACHINE 🎰\n━━━━━━━━━━━━━━━\n[ ${slot1} | ${slot2} | ${slot3} ]\n━━━━━━━━━━━━━━━\n😭 YOU LOST!\n💸 -$${bet.toLocaleString()}\n💵 Balance: $${newBal.toLocaleString()}`);
     }
   }
