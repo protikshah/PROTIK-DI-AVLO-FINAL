@@ -1,7 +1,7 @@
 module.exports = {
   config: {
     name: "bet",
-    version: "1.0",
+    version: "1.1",
     author: "Protik / Assistant",
     countDown: 3,
     role: 0,
@@ -18,7 +18,8 @@ module.exports = {
     if (bet > 10000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $10,000,000 (10M)!");
 
     let userData = await usersData.get(senderID);
-    let money = (userData.data && userData.data.money !== undefined) ? userData.data.money : 10000000;
+    let uData = userData.data || {};
+    let money = uData.money !== undefined ? uData.money : 10000000;
 
     if (money < bet) return message.reply("❌ | Not enough balance!");
 
@@ -26,11 +27,13 @@ module.exports = {
 
     if (isWin) {
       let newBal = money + bet;
-      await usersData.set(senderID, { money: newBal });
+      uData.money = newBal;
+      await usersData.set(senderID, { data: uData });
       return message.reply(`💥 YOU WON THE BET!\n🎰 You bet: $${bet.toLocaleString()}\n💰 You won: $${bet.toLocaleString()}\n💵 New balance: $${newBal.toLocaleString()}`);
     } else {
       let newBal = money - bet;
-      await usersData.set(senderID, { money: newBal });
+      uData.money = newBal;
+      await usersData.set(senderID, { data: uData });
       return message.reply(`💥 You lost everything!\n🎰 You bet: $${bet.toLocaleString()}\n💸 You won: $0\n💵 New balance: $${newBal.toLocaleString()}`);
     }
   }
