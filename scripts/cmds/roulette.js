@@ -6,11 +6,11 @@ module.exports = {
   config: {
     name: "roulette",
     aliases: ["wheel"],
-    version: "2.5",
+    version: "3.0",
     author: "Protik / Assistant",
-    countDown: 5,
+    countDown: 3,
     role: 0,
-    shortDescription: { en: "Roulette spin with video" },
+    shortDescription: { en: "Spin roulette wheel" },
     category: "games",
     guide: { en: "{pn} [bet_amount]" }
   },
@@ -30,15 +30,8 @@ module.exports = {
 
     const multipliers = [0, 0.5, 1, 1.5, 2, 5, 10];
     const landed = multipliers[Math.floor(Math.random() * multipliers.length)];
-
-    const videoUrl = landed >= 1 ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
-    const cacheVideo = path.join(__dirname, "cache", `roulette_${Date.now()}.mp4`);
-    await fs.ensureDir(path.join(__dirname, "cache"));
-
-    const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer" });
-    await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
-
     let msg = "";
+
     if (landed > 1) {
       let profit = Math.floor(bet * (landed - 1));
       uData.money = money + profit;
@@ -53,9 +46,20 @@ module.exports = {
 
     await usersData.set(senderID, { data: uData });
 
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cacheVideo)
-    }, () => fs.unlinkSync(cacheVideo));
+    const videoUrl = landed >= 1 ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
+    const cacheVideo = path.join(__dirname, "cache", `roulette_${Date.now()}.mp4`);
+    await fs.ensureDir(path.join(__dirname, "cache"));
+
+    try {
+      const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer", timeout: 5000 });
+      await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
+      
+      return message.reply({
+        body: msg,
+        attachment: [fs.createReadStream(cacheVideo)]
+      }, () => { if (fs.existsSync(cacheVideo)) fs.unlinkSync(cacheVideo); });
+    } catch (e) {
+      return message.reply(msg);
+    }
   }
 };
