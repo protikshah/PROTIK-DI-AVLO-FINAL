@@ -1,11 +1,15 @@
+const fs = require("fs-extra");
+const axios = require("axios");
+const path = require("path");
+
 module.exports = {
   config: {
     name: "rps",
-    version: "1.1",
+    version: "2.5",
     author: "Protik / Assistant",
-    countDown: 3,
+    countDown: 5,
     role: 0,
-    shortDescription: { en: "Play Rock Paper Scissors" },
+    shortDescription: { en: "Rock Paper Scissors with video" },
     category: "games",
     guide: { en: "{pn} [rock/paper/scissors] [bet_amount]" }
   },
@@ -15,10 +19,8 @@ module.exports = {
     const userChoice = args[0]?.toLowerCase();
     const bet = parseInt(args[1]);
 
-    if (!userChoice || !["rock", "paper", "scissors"].includes(userChoice) || isNaN(bet) || bet <= 0) {
-      return message.reply("❌ | সঠিক ফরম্যাট: !rps [rock/paper/scissors] [bet_amount]");
-    }
-    if (bet > 10000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $10,000,000 (10M)!");
+    if (!userChoice || !["rock", "paper", "scissors"].includes(userChoice) || isNaN(bet) || bet <= 0) return message.reply("❌ | ফরম্যাট: !rps [rock/paper/scissors] [bet_amount]");
+    if (bet > 50000000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $50,000,000,000 (50 Billion)!");
 
     let userData = await usersData.get(senderID);
     let uData = userData.data || {};
@@ -30,25 +32,34 @@ module.exports = {
     const botChoice = choices[Math.floor(Math.random() * choices.length)];
     const icons = { rock: "🪨", paper: "📄", scissors: "✂️" };
 
-    if (userChoice === botChoice) {
-      return message.reply(`✂️ ROCK PAPER SCISSORS ✂️\n You: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n🤝 DRAW! (টাকা ফেরত নেওয়া হয়েছে)`);
-    }
-
     const isWin = 
       (userChoice === "rock" && botChoice === "scissors") ||
       (userChoice === "paper" && botChoice === "rock") ||
       (userChoice === "scissors" && botChoice === "paper");
 
-    if (isWin) {
-      let newBal = money + bet;
-      uData.money = newBal;
-      await usersData.set(senderID, { data: uData });
-      return message.reply(`✂️ ROCK PAPER SCISSORS ✂️\n You: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n🎉 YOU WON!\n💰 +$${bet.toLocaleString()}\n💵 Balance: $${newBal.toLocaleString()}`);
+    const videoUrl = isWin ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
+    const cacheVideo = path.join(__dirname, "cache", `rps_${Date.now()}.mp4`);
+    await fs.ensureDir(path.join(__dirname, "cache"));
+
+    const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer" });
+    await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
+
+    let msg = "";
+    if (userChoice === botChoice) {
+      msg = `✂️ ROCK PAPER SCISSORS ✂️\nYou: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n\n🤝 DRAW! (টাকা ফেরত নেওয়া হয়েছে)`;
+    } else if (isWin) {
+      uData.money = money + bet;
+      msg = `✂️ ROCK PAPER SCISSORS ✂️\nYou: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n\n🎉 YOU WON!\n💰 +$${bet.toLocaleString()}\n💵 Balance: $${uData.money.toLocaleString()}`;
     } else {
-      let newBal = money - bet;
-      uData.money = newBal;
-      await usersData.set(senderID, { data: uData });
-      return message.reply(`✂️ ROCK PAPER SCISSORS ✂️\n You: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n😭 YOU LOST!\n💸 -$${bet.toLocaleString()}\n💵 Balance: $${newBal.toLocaleString()}`);
+      uData.money = money - bet;
+      msg = `✂️ ROCK PAPER SCISSORS ✂️\nYou: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n\n😭 YOU LOST!\n💸 -$${bet.toLocaleString()}\n💵 Balance: $${uData.money.toLocaleString()}`;
     }
+
+    await usersData.set(senderID, { data: uData });
+
+    return message.reply({
+      body: msg,
+      attachment: fs.createReadStream(cacheVideo)
+    }, () => fs.unlinkSync(cacheVideo));
   }
 };
