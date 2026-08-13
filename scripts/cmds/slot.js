@@ -6,11 +6,11 @@ module.exports = {
   config: {
     name: "slot",
     aliases: ["slots"],
-    version: "2.5",
+    version: "3.0",
     author: "Protik / Assistant",
-    countDown: 5,
+    countDown: 3,
     role: 0,
-    shortDescription: { en: "Spin slot machine with video" },
+    shortDescription: { en: "Spin the slot machine" },
     category: "games",
     guide: { en: "{pn} [bet_amount]" }
   },
@@ -19,7 +19,7 @@ module.exports = {
     const { senderID } = event;
     const bet = parseInt(args[0]);
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ | নিয়ম: !slot [bet_amount]");
+    if (isNaN(bet) || bet <= 0) return message.reply("❌ | ব্যবহারের নিয়ম: !slot [bet_amount]");
     if (bet > 50000000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $50,000,000,000 (50 Billion)!");
 
     let userData = await usersData.get(senderID);
@@ -38,28 +38,33 @@ module.exports = {
     else if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) winMultiplier = 1.5;
 
     const isWin = winMultiplier > 0;
-    const videoUrl = isWin ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
-    const cacheVideo = path.join(__dirname, "cache", `slot_${Date.now()}.mp4`);
-    await fs.ensureDir(path.join(__dirname, "cache"));
-
-    const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer" });
-    await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
-
     let msg = "";
+
     if (isWin) {
       let prize = Math.floor(bet * winMultiplier);
       uData.money = money + prize;
-      msg = `🎰 SLOT MACHINE 🎰\n[ ${slot1} | ${slot2} | ${slot3} ]\n\n🎉 JACKPOT/WIN!\n💰 +$${prize.toLocaleString()}\n💵 Balance: $${uData.money.toLocaleString()}`;
+      msg = `🎰 SLOT MACHINE 🎰\n━━━━━━━━━━━━━━━\n[ ${slot1} | ${slot2} | ${slot3} ]\n━━━━━━━━━━━━━━━\n🎉 JACKPOT/WIN!\n💰 +$${prize.toLocaleString()}\n💵 Balance: $${uData.money.toLocaleString()}`;
     } else {
       uData.money = money - bet;
-      msg = `🎰 SLOT MACHINE 🎰\n[ ${slot1} | ${slot2} | ${slot3} ]\n\n😭 YOU LOST!\n💸 -$${bet.toLocaleString()}\n💵 Balance: $${uData.money.toLocaleString()}`;
+      msg = `🎰 SLOT MACHINE 🎰\n━━━━━━━━━━━━━━━\n[ ${slot1} | ${slot2} | ${slot3} ]\n━━━━━━━━━━━━━━━\n😭 YOU LOST!\n💸 -$${bet.toLocaleString()}\n💵 Balance: $${uData.money.toLocaleString()}`;
     }
 
     await usersData.set(senderID, { data: uData });
 
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cacheVideo)
-    }, () => fs.unlinkSync(cacheVideo));
+    const videoUrl = isWin ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
+    const cacheVideo = path.join(__dirname, "cache", `slot_${Date.now()}.mp4`);
+    await fs.ensureDir(path.join(__dirname, "cache"));
+
+    try {
+      const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer", timeout: 5000 });
+      await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
+      
+      return message.reply({
+        body: msg,
+        attachment: [fs.createReadStream(cacheVideo)]
+      }, () => { if (fs.existsSync(cacheVideo)) fs.unlinkSync(cacheVideo); });
+    } catch (e) {
+      return message.reply(msg);
+    }
   }
 };
