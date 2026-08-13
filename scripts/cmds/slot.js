@@ -1,90 +1,46 @@
-module.exports.config = {
-  name: "slot",
-  version: "3.0.0",
-  author: "EryXenX",
-  role: 0,
-  category: "economy",
-  shortDescription: "Slot Machine Game"
-};
+module.exports = {
+  config: {
+    name: "slot",
+    aliases: ["slots"],
+    version: "1.0",
+    author: "Protik / Assistant",
+    countDown: 3,
+    role: 0,
+    shortDescription: { en: "Spin the slot machine" },
+    category: "games",
+    guide: { en: "{pn} [bet_amount]" }
+  },
 
-module.exports.onStart = async function ({ api, event, args, usersData }) {
-  const { senderID, threadID, messageID } = event;
+  onStart: async function ({ message, args, event, usersData }) {
+    const { senderID } = event;
+    const bet = parseInt(args[0]);
 
-  const bet = parseInt(args[0]);
-  if (!bet || bet <= 0)
-    return api.sendMessage("Enter valid bet amount.", threadID, messageID);
+    if (isNaN(bet) || bet <= 0) return message.reply("❌ | ব্যবহারের নিয়ম: !slot [bet_amount]");
+    if (bet > 10000000) return message.reply("❌ | সর্বোচ্চ বেট লিমিট $10,000,000 (10M)!");
 
-  const userData = await usersData.get(senderID);
-  let balance = userData?.data?.money ?? 100;
+    let userData = await usersData.get(senderID);
+    let money = (userData.data && userData.data.money !== undefined) ? userData.data.money : 10000000;
 
-  if (balance < bet)
-    return api.sendMessage("❌ Not enough balance!", threadID, messageID);
+    if (money < bet) return message.reply("❌ | পর্যাপ্ত ব্যালেন্স নেই!");
 
-  const symbols = ["🍎", "🍌", "🍒", "⭐", "7️⃣"];
-  const win = Math.random() * 100 < 60;
-  const winAmount = bet;
+    const icons = ["🎰", "⭐", "💎", "🔔", "🍎"];
+    const slot1 = icons[Math.floor(Math.random() * icons.length)];
+    const slot2 = icons[Math.floor(Math.random() * icons.length)];
+    const slot3 = icons[Math.floor(Math.random() * icons.length)];
 
-  let slot1, slot2, slot3;
+    let winMultiplier = 0;
+    if (slot1 === slot2 && slot2 === slot3) winMultiplier = 3; // Triple match (3x)
+    else if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) winMultiplier = 1.5; // Double match (1.5x)
 
-  if (win) {
-    const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-    slot1 = slot2 = slot3 = symbol;
-    balance += winAmount;
-  } else {
-    do {
-      slot1 = symbols[Math.floor(Math.random() * symbols.length)];
-      slot2 = symbols[Math.floor(Math.random() * symbols.length)];
-      slot3 = symbols[Math.floor(Math.random() * symbols.length)];
-    } while (slot1 === slot2 && slot2 === slot3);
-    balance -= bet;
+    if (winMultiplier > 0) {
+      let prize = Math.floor(bet * winMultiplier);
+      let newBal = money + prize;
+      await usersData.set(senderID, { money: newBal });
+      return message.reply(`🎰 SLOT MACHINE 🎰\n━━━━━━━━━━━━━━━\n[ ${slot1} | ${slot2} | ${slot3} ]\n━━━━━━━━━━━━━━━\n🎉 JACKPOT/WIN!\n💰 +$${prize.toLocaleString()}\n💵 Balance: $${newBal.toLocaleString()}`);
+    } else {
+      let newBal = money - bet;
+      await usersData.set(senderID, { money: newBal });
+      return message.reply(`🎰 SLOT MACHINE 🎰\n━━━━━━━━━━━━━━━\n[ ${slot1} | ${slot2} | ${slot3} ]\n━━━━━━━━━━━━━━━\n😭 YOU LOST!\n💸 -$${bet.toLocaleString()}\n💵 Balance: $${newBal.toLocaleString()}`);
+    }
   }
-
-  await usersData.set(senderID, { data: { ...userData.data, money: balance } });
-
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  const buildFrame = (s1, s2, s3, status) => {
-    return `🎰 SLOT MACHINE 🎰\n──────────────────\n🎲 ${status} →\n[ ${s1} | ${s2} | ${s3} ]`;
-  };
-
-  const initialMsg = `${buildFrame("❓", "❓", "❓", "Spinning")}\n\nGood luck! 🍀`;
-
-  api.sendMessage(initialMsg, threadID, (err, info) => {
-    if (err || !info) return;
-
-    const messageIDForEdit = info.messageID;
-
-    (async () => {
-      await delay(700);
-      api.editMessage(buildFrame(slot1, "❓", "❓", "Spinning"), messageIDForEdit);
-
-      await delay(700);
-      api.editMessage(buildFrame(slot1, slot2, "❓", "Spinning"), messageIDForEdit);
-
-      await delay(700);
-
-      let finalText;
-      if (win) {
-        finalText =
-          `${buildFrame(slot1, slot2, slot3, "Result")}\n` +
-          `──────────────────\n` +
-          `🏆 JACKPOT WINNER! 🏆\n` +
-          `💵 Earned → +${winAmount}$\n` +
-          `💰 Balance → ${balance}$\n` +
-          `──────────────────\n` +
-          `Bet again? Type: slot <amount>`;
-      } else {
-        finalText =
-          `${buildFrame(slot1, slot2, slot3, "Result")}\n` +
-          `──────────────────\n` +
-          `💸 YOU LOSE!\n` +
-          `💵 Lost → -${bet}$\n` +
-          `💰 Balance → ${balance}$\n` +
-          `──────────────────\n` +
-          `Better luck next time! 🍀`;
-      }
-
-      api.editMessage(finalText, messageIDForEdit);
-    })();
-  }, messageID);
 };
