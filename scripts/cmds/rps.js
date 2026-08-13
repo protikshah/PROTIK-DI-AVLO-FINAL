@@ -5,11 +5,11 @@ const path = require("path");
 module.exports = {
   config: {
     name: "rps",
-    version: "2.5",
+    version: "3.0",
     author: "Protik / Assistant",
-    countDown: 5,
+    countDown: 3,
     role: 0,
-    shortDescription: { en: "Rock Paper Scissors with video" },
+    shortDescription: { en: "Rock Paper Scissors" },
     category: "games",
     guide: { en: "{pn} [rock/paper/scissors] [bet_amount]" }
   },
@@ -37,13 +37,6 @@ module.exports = {
       (userChoice === "paper" && botChoice === "rock") ||
       (userChoice === "scissors" && botChoice === "paper");
 
-    const videoUrl = isWin ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
-    const cacheVideo = path.join(__dirname, "cache", `rps_${Date.now()}.mp4`);
-    await fs.ensureDir(path.join(__dirname, "cache"));
-
-    const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer" });
-    await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
-
     let msg = "";
     if (userChoice === botChoice) {
       msg = `✂️ ROCK PAPER SCISSORS ✂️\nYou: ${icons[userChoice]} vs Bot: ${icons[botChoice]}\n\n🤝 DRAW! (টাকা ফেরত নেওয়া হয়েছে)`;
@@ -57,9 +50,20 @@ module.exports = {
 
     await usersData.set(senderID, { data: uData });
 
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cacheVideo)
-    }, () => fs.unlinkSync(cacheVideo));
+    const videoUrl = isWin ? "https://i.imgur.com/K0YQ2mX.mp4" : "https://i.imgur.com/43A8gYm.mp4";
+    const cacheVideo = path.join(__dirname, "cache", `rps_${Date.now()}.mp4`);
+    await fs.ensureDir(path.join(__dirname, "cache"));
+
+    try {
+      const vidRes = await axios.get(videoUrl, { responseType: "arraybuffer", timeout: 5000 });
+      await fs.writeFile(cacheVideo, Buffer.from(vidRes.data));
+      
+      return message.reply({
+        body: msg,
+        attachment: [fs.createReadStream(cacheVideo)]
+      }, () => { if (fs.existsSync(cacheVideo)) fs.unlinkSync(cacheVideo); });
+    } catch (e) {
+      return message.reply(msg);
+    }
   }
 };
