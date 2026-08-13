@@ -2,10 +2,10 @@ module.exports = {
   config: {
     name: "addbal",
     aliases: ["deposit", "addmoney"],
-    version: "1.1",
+    version: "2.5",
     author: "Protik / Assistant",
     countDown: 2,
-    role: 2, // Admin only
+    role: 2,
     shortDescription: { en: "Deposit money to user account" },
     category: "economy",
     guide: { en: "{pn} [Amount] (reply/mention user)" }
@@ -25,9 +25,7 @@ module.exports = {
       return message.reply("❌ | মামা, কাউকে রিপ্লাই দিয়ে বা মেনশন করে টাকার পরিমাণ লেখো!");
     }
 
-    if (isNaN(amount) || amount <= 0) {
-      return message.reply("❌ | সঠিক টাকার পরিমাণ প্রদান করো!");
-    }
+    if (isNaN(amount) || amount <= 0) return message.reply("❌ | সঠিক টাকার পরিমাণ প্রদান করো!");
 
     let userData = await usersData.get(targetID);
     let uData = userData.data || {};
