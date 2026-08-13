@@ -2,7 +2,7 @@ module.exports = {
   config: {
     name: "sendmoney",
     aliases: ["pay", "transfer", "send"],
-    version: "1.1",
+    version: "2.5",
     author: "Protik / Assistant",
     countDown: 5,
     role: 0,
@@ -23,7 +23,7 @@ module.exports = {
       targetID = Object.keys(event.mentions)[0];
       amount = parseInt(args[args.length - 1]);
     } else {
-      return message.reply("❌ | মামা, যাকে টাকা পাঠাতে চাও তাকে রিপ্লাই দাও অথবা মেনশন করে টাকার পরিমাণ লেখো!");
+      return message.reply("❌ | মামা, কাকে টাকা পাঠাবে তাকে রিপ্লাই বা মেনশন দাও!");
     }
 
     if (targetID === senderID) return message.reply("❌ | নিজের একাউন্টে নিজে টাকা পাঠাতে পারবে না!");
@@ -41,25 +41,12 @@ module.exports = {
     let tData = targetData.data || {};
     let targetMoney = tData.money !== undefined ? tData.money : 10000000;
 
-    let newSenderBal = senderMoney - amount;
-    let newTargetBal = targetMoney + amount;
-
-    sData.money = newSenderBal;
-    tData.money = newTargetBal;
+    sData.money = senderMoney - amount;
+    tData.money = targetMoney + amount;
 
     await usersData.set(senderID, { data: sData });
     await usersData.set(targetID, { data: tData });
 
-    const targetName = targetData.name || "User";
-
-    return message.reply(
-      `💸 𝐒𝐄𝐍𝐃 𝐌𝐎𝐍𝐄𝐘 𝐒𝐔𝐂𝐂𝐄𝐒𝐒 💸\n` +
-      `━━━━━━━━━━━━━━━━━━━\n` +
-      `👤 Sender: You\n` +
-      `👤 Receiver: ${targetName}\n` +
-      `💰 Amount Sent: $${amount.toLocaleString()}\n` +
-      `━━━━━━━━━━━━━━━━━━━\n` +
-      `💵 Your Remaining Balance: $${newSenderBal.toLocaleString()}`
-    );
+    return message.reply(`💸 𝐒𝐄𝐍𝐃 𝐌𝐎𝐍𝐄𝐘 𝐒𝐔𝐂𝐂𝐄𝐒𝐒 💸\n💰 Amount: $${amount.toLocaleString()}\n💵 Remaining Balance: $${sData.money.toLocaleString()}`);
   }
 };
