@@ -23,30 +23,21 @@ module.exports = {
       targetID = Object.keys(event.mentions)[0];
       amount = parseInt(args[args.length - 1]);
     } else {
-      return message.reply("❌ | মামা, কাকে টাকা পাঠাবে তাকে রিপ্লাই বা মেনশন দাও!");
+      return message.reply("❌ | Please reply to a user or mention someone to send money!");
     }
 
-    if (targetID === senderID) return message.reply("❌ | নিজের একাউন্টে নিজে টাকা পাঠাতে পারবে না!");
-    if (isNaN(amount) || amount <= 0) return message.reply("❌ | সঠিক টাকার পরিমাণ প্রদান করো!");
+    if (targetID === senderID) return message.reply("❌ | You cannot send money to yourself!");
+    if (isNaN(amount) || amount <= 0) return message.reply("❌ | Please enter a valid amount!");
 
-    let senderData = await usersData.get(senderID);
-    let sData = senderData.data || {};
-    let senderMoney = sData.money !== undefined ? sData.money : 10000000;
+    const senderMoney = await usersData.getMoney(senderID);
 
     if (senderMoney < amount) {
-      return message.reply(`❌ | তোমার একাউন্টে পর্যাপ্ত টাকা নেই!\n💸 বর্তমান ব্যালেন্স: $${senderMoney.toLocaleString()}`);
+      return message.reply(`❌ | Insufficient funds in your account!\n💸 Current Balance: $${senderMoney.toLocaleString()}`);
     }
 
-    let targetData = await usersData.get(targetID);
-    let tData = targetData.data || {};
-    let targetMoney = tData.money !== undefined ? tData.money : 10000000;
+    const updatedSender = await usersData.subtractMoney(senderID, amount);
+    await usersData.addMoney(targetID, amount);
 
-    sData.money = senderMoney - amount;
-    tData.money = targetMoney + amount;
-
-    await usersData.set(senderID, { data: sData });
-    await usersData.set(targetID, { data: tData });
-
-    return message.reply(`💸 𝐒𝐄𝐍𝐃 𝐌𝐎𝐍𝐄𝐘 𝐒𝐔𝐂𝐂𝐄𝐒𝐒 💸\n💰 Amount: $${amount.toLocaleString()}\n💵 Remaining Balance: $${sData.money.toLocaleString()}`);
+    return message.reply(`💸 𝐒𝐄𝐍𝐃 𝐌𝐎𝐍𝐄𝐘 𝐒𝐔𝐂𝐂𝐄𝐒𝐒 💸\n💰 Amount: $${amount.toLocaleString()}\n💵 Remaining Balance: $${updatedSender.money.toLocaleString()}`);
   }
 };
