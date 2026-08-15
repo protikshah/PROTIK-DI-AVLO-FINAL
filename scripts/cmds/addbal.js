@@ -22,20 +22,14 @@ module.exports = {
       targetID = Object.keys(event.mentions)[0];
       amount = parseInt(args[args.length - 1]);
     } else {
-      return message.reply("❌ | মামা, কাউকে রিপ্লাই দিয়ে বা মেনশন করে টাকার পরিমাণ লেখো!");
+      return message.reply("❌ | Please reply to a user or mention someone to specify the amount!");
     }
 
-    if (isNaN(amount) || amount <= 0) return message.reply("❌ | সঠিক টাকার পরিমাণ প্রদান করো!");
+    if (isNaN(amount) || amount <= 0) return message.reply("❌ | Please provide a valid positive amount!");
 
-    let userData = await usersData.get(targetID);
-    let uData = userData.data || {};
-    let currentMoney = uData.money !== undefined ? uData.money : 10000000;
-    
-    let newBalance = currentMoney + amount;
-    uData.money = newBalance;
+    const updatedUser = await usersData.addMoney(targetID, amount);
+    const newBalance = updatedUser.money;
 
-    await usersData.set(targetID, { data: uData });
-
-    return message.reply(`✅ | সফলভাবে $${amount.toLocaleString()} ডিপোজিট করা হয়েছে!\n💰 নতুন ব্যালেন্স: $${newBalance.toLocaleString()}`);
+    return message.reply(`✅ | Successfully deposited $${amount.toLocaleString()}!\n💰 New Balance: $${newBalance.toLocaleString()}`);
   }
 };
