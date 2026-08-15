@@ -15,18 +15,11 @@ module.exports = {
     guide: { en: "{pn}" }
   },
 
-  onStart: async function ({ message, event, usersData, api }) {
+  onStart: async function ({ message, event, usersData }) {
     const { senderID } = event;
-    let userData = await usersData.get(senderID);
-    let uData = userData.data || {};
 
-    if (uData.money === undefined) {
-      uData.money = 10000000;
-      await usersData.set(senderID, { data: uData });
-    }
-
-    const money = uData.money;
-    const name = userData.name || "VIP User";
+    const money = await usersData.getMoney(senderID);
+    const name = await usersData.getName(senderID) || "VIP User";
 
     const canvas = createCanvas(850, 480);
     const ctx = canvas.getContext("2d");
@@ -49,8 +42,8 @@ module.exports = {
     ctx.strokeRect(25, 25, 800, 430);
 
     // User Profile Picture
-    let avatarUrl = await usersData.getAvatarUrl(senderID);
     try {
+      let avatarUrl = await usersData.getAvatarUrl(senderID);
       let avatar = await loadImage(avatarUrl);
       ctx.save();
       ctx.beginPath();
@@ -59,7 +52,7 @@ module.exports = {
       ctx.clip();
       ctx.drawImage(avatar, 60, 60, 100, 100);
       ctx.restore();
-      
+
       ctx.strokeStyle = "#D4AF37";
       ctx.lineWidth = 4;
       ctx.beginPath();
