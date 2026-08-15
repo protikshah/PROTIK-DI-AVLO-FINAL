@@ -19,21 +19,23 @@ module.exports = {
     const { senderID } = event;
     const bet = parseInt(args[0]);
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ | নিয়ম: !casino [bet_amount]");
-    if (bet > 50000000000) return message.reply("❌ | সর্বোচ্চ লিমিট $50 Billion!");
+    if (isNaN(bet) || bet <= 0) return message.reply("❌ | Usage: !casino [bet_amount]");
+    if (bet > 50000000000) return message.reply("❌ | Maximum bet limit is $50 Billion!");
 
-    let userData = await usersData.get(senderID);
-    let uData = userData.data || {};
-    let money = uData.money !== undefined ? uData.money : 10000000;
-
-    if (money < bet) return message.reply("❌ | পর্যাপ্ত ব্যালেন্স নেই!");
+    const money = await usersData.getMoney(senderID);
+    if (money < bet) return message.reply("❌ | Insufficient balance!");
 
     const isWin = Math.random() < 0.45;
     const winAmount = bet * 2;
-    const newBalance = isWin ? money + winAmount : money - bet;
+    let newBalance;
 
-    uData.money = newBalance;
-    await usersData.set(senderID, { data: uData });
+    if (isWin) {
+      const updatedUser = await usersData.addMoney(senderID, winAmount);
+      newBalance = updatedUser.money;
+    } else {
+      const updatedUser = await usersData.subtractMoney(senderID, bet);
+      newBalance = updatedUser.money;
+    }
 
     const canvas = createCanvas(800, 450);
     const ctx = canvas.getContext("2d");
@@ -70,8 +72,8 @@ module.exports = {
     fs.writeFileSync(cardPath, canvas.toBuffer("image/png"));
 
     const msg = isWin 
-      ? `🃏 | সাবাশ! পোকার টেবিলে আপনি $${winAmount.toLocaleString()} জিতেছেন!` 
-      : `🃏 | আফসোস! পোকার টেবিলে $${bet.toLocaleString()} খুয়েছেন!`;
+      ? `🃏 | Well done! You won $${winAmount.toLocaleString()} at the poker table!` 
+      : `🃏 | Regret! You lost $${bet.toLocaleString()} at the poker table!`;
 
     return message.reply({
       body: msg,
