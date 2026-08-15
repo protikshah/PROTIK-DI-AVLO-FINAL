@@ -17,7 +17,7 @@ module.exports = {
 
   onStart: async function ({ message, usersData }) {
     const allUsers = await usersData.getAll();
-    allUsers.sort((a, b) => ((b.data?.money || 10000000) - (a.data?.money || 10000000)));
+    allUsers.sort((a, b) => (b.money || 0) - (a.money || 0));
 
     let top = allUsers.slice(0, 10);
 
@@ -40,7 +40,7 @@ module.exports = {
 
     let y = 130;
     top.forEach((u, i) => {
-      let money = u.data?.money !== undefined ? u.data.money : 10000000;
+      let money = u.money || 0;
       let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
 
       ctx.fillStyle = i < 3 ? "#FFD700" : "#FFFFFF";
