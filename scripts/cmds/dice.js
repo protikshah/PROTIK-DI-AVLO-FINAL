@@ -19,14 +19,11 @@ module.exports = {
     const { senderID } = event;
     const bet = parseInt(args[0]);
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ | নিয়ম: !dice [bet_amount]");
-    if (bet > 50000000000) return message.reply("❌ | সর্বোচ্চ লিমিট $50 Billion!");
+    if (isNaN(bet) || bet <= 0) return message.reply("❌ | Usage: !dice [bet_amount]");
+    if (bet > 50000000000) return message.reply("❌ | Maximum bet limit is $50 Billion!");
 
-    let userData = await usersData.get(senderID);
-    let uData = userData.data || {};
-    let money = uData.money !== undefined ? uData.money : 10000000;
-
-    if (money < bet) return message.reply("❌ | পর্যাপ্ত ব্যালেন্স নেই!");
+    const money = await usersData.getMoney(senderID);
+    if (money < bet) return message.reply("❌ | Insufficient balance!");
 
     const userRoll = Math.floor(Math.random() * 6) + 1;
     const botRoll = Math.floor(Math.random() * 6) + 1;
@@ -39,13 +36,12 @@ module.exports = {
 
     if (isWin) {
       winAmount = bet;
-      newBalance = money + winAmount;
+      const updatedUser = await usersData.addMoney(senderID, winAmount);
+      newBalance = updatedUser.money;
     } else if (!isDraw) {
-      newBalance = money - bet;
+      const updatedUser = await usersData.subtractMoney(senderID, bet);
+      newBalance = updatedUser.money;
     }
-
-    uData.money = newBalance;
-    await usersData.set(senderID, { data: uData });
 
     const canvas = createCanvas(800, 450);
     const ctx = canvas.getContext("2d");
@@ -64,7 +60,7 @@ module.exports = {
 
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 45px Sans-serif";
-    ctx.fillText(`You: 🎲 [ ${userRoll} ]   vs   Bot: 🎲 [ ${botRoll} ]`, 400, 170);
+    ctx.fillText(`You: 🎲 [ ${userRoll} ]    vs    Bot: 🎲 [ ${botRoll} ]`, 400, 170);
 
     ctx.font = "bold 32px Sans-serif";
     ctx.fillStyle = isWin ? "#2ecc71" : (isDraw ? "#f39c12" : "#e74c3c");
@@ -82,8 +78,8 @@ module.exports = {
     fs.writeFileSync(cardPath, canvas.toBuffer("image/png"));
 
     const msg = isWin 
-      ? `🎲 | জিতেছেন! আপনার ছক্কা বেশি পড়েছে, পয়েন্ট $${winAmount.toLocaleString()} যোগ হয়েছে!` 
-      : (isDraw ? `🎲 | ড্র হয়েছে! কোনো টাকা কাটা যায়নি।` : `🎲 | হেরে গেছেন! আপনার পয়েন্ট কম পড়েছে।`);
+      ? `🎲 | You won! Your roll was higher, $${winAmount.toLocaleString()} added to your account!` 
+      : (isDraw ? `🎲 | It's a draw! No money was deducted.` : `🎲 | You lost! Your roll was lower.`);
 
     return message.reply({
       body: msg,
