@@ -1,65 +1,61 @@
-const { createCanvas } = require("canvas");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports = {
   config: {
     name: "top",
-    aliases: ["leaderboard"],
-    version: "2.5",
+    aliases: ["leaderboard", "lb", "rich"],
+    version: "7.0",
     author: "Protik / Assistant",
     countDown: 5,
     role: 0,
-    shortDescription: { en: "Top richest users luxury card" },
+    shortDescription: { en: "View top 15 richest players" },
     category: "economy",
     guide: { en: "{pn}" }
   },
 
   onStart: async function ({ message, usersData }) {
     const allUsers = await usersData.getAll();
-    allUsers.sort((a, b) => (b.money || 0) - (a.money || 0));
 
-    let top = allUsers.slice(0, 10);
+    if (!allUsers || allUsers.length === 0) {
+      return message.reply("> 🏆\n• No user data found!");
+    }
 
-    const canvas = createCanvas(800, 750);
-    const ctx = canvas.getContext("2d");
+    // Filter and Sort by Money
+    const sortedUsers = allUsers
+      .map(u => {
+        const money = typeof u.money === "number" ? u.money : (u.data?.money || 0);
+        return {
+          userID: u.userID,
+          name: u.name || "Anonymous User",
+          money: money
+        };
+      })
+      .sort((a, b) => b.money - a.money)
+      .slice(0, 15);
 
-    // Background
-    ctx.fillStyle = "#0D0B18";
-    ctx.fillRect(0, 0, 800, 750);
+    const formatMoney = (num) => {
+      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+      return num.toLocaleString();
+    };
 
-    // Gold Border
-    ctx.strokeStyle = "#D4AF37";
-    ctx.lineWidth = 6;
-    ctx.strokeRect(15, 15, 770, 720);
+    const getRankBadge = (rank) => {
+      if (rank === 1) return "🥇 [TOP 1]";
+      if (rank === 2) return "🥈 [TOP 2]";
+      if (rank === 3) return "🥉 [TOP 3]";
+      if (rank <= 5) return "💎 [VIP]";
+      return "✨ [MEMBER]";
+    };
 
-    // Header
-    ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 36px sans-serif";
-    ctx.fillText("🏆 RICHEST TRILLIONAIRES 🏆", 150, 70);
+    let leaderboardMsg = `🏆 ═══ [ DI-ABLO BANK TOP 15 RICHEST ] ═══ 🏆\n\n`;
 
-    let y = 130;
-    top.forEach((u, i) => {
-      let money = u.money || 0;
-      let medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
-
-      ctx.fillStyle = i < 3 ? "#FFD700" : "#FFFFFF";
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText(`${medal} ${u.name || "User"}`, 40, y);
-
-      ctx.fillStyle = "#00FF66";
-      ctx.fillText(`$${money.toLocaleString()}`, 520, y);
-
-      y += 58;
+    sortedUsers.forEach((user, index) => {
+      const rank = index + 1;
+      const badge = getRankBadge(rank);
+      leaderboardMsg += `${badge} ${rank}. ${user.name}\n• Balance: $${formatMoney(user.money)}\n\n`;
     });
 
-    const cachePath = path.join(__dirname, "cache", `top_board.png`);
-    await fs.ensureDir(path.join(__dirname, "cache"));
-    await fs.writeFile(cachePath, canvas.toBuffer("image/png"));
+    leaderboardMsg += `────────────────────────────\n> 👑 Work hard to claim the #1 Crown!`;
 
-    return message.reply({
-      body: "🏆 𝐓𝐎𝐏 𝐑𝐈𝐂𝐇𝐄𝐒𝐓 𝐋𝐄𝐀𝐃𝐄𝐑𝐁𝐎𝐀𝐑𝐃 🏆",
-      attachment: fs.createReadStream(cachePath)
-    }, () => fs.unlinkSync(cachePath));
+    return message.reply(leaderboardMsg);
   }
 };
