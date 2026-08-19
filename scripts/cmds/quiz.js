@@ -74,15 +74,15 @@ module.exports = {
     const correctAnswerText = randomQuiz.options[randomQuiz.correctIndex];
 
     const quizBox = 
-      `╔══════════════════════════════╗\n` +
+      `╔══════════════════════╗\n` +
       `      🔮  DI-ABLO BRAIN QUIZ  🔮\n` +
-      `╚══════════════════════════════╝\n\n` +
+      `╚══════════════════════╝\n\n` +
       `❓  ${randomQuiz.q}\n\n` +
       ` ┣► 🅰️  ${randomQuiz.options[0]}\n` +
       ` ┣► 🅱️  ${randomQuiz.options[1]}\n` +
       ` ┣► 🅲  ${randomQuiz.options[2]}\n` +
       ` ┗► 🅳  ${randomQuiz.options[3]}\n\n` +
-      `───────────── • 🎖️ • ─────────────\n` +
+      `─────── • 🎖️ • ───────\n` +
       `🏷️ Category : ${randomQuiz.category}\n` +
       `💰 Reward   : $1,000,000\n` +
       `⏳ Time Limit: 30 Seconds\n\n` +
