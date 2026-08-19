@@ -1,86 +1,92 @@
-const { createCanvas } = require("canvas");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports = {
   config: {
     name: "roulette",
-    aliases: ["rlt"],
-    version: "5.0",
+    aliases: ["rl"],
+    version: "7.0",
     author: "Protik / Assistant",
     countDown: 3,
     role: 0,
-    shortDescription: { en: "Spin the roulette wheel" },
+    shortDescription: { en: "European Casino Roulette" },
     category: "games",
-    guide: { en: "{pn} [bet_amount]" }
+    guide: { en: "{pn} [red/black/even/odd] [bet_amount]" }
   },
 
   onStart: async function ({ message, args, event, usersData }) {
     const { senderID } = event;
-    const bet = parseInt(args[0]);
+    const choice = args[0] ? args[0].toLowerCase() : null;
+    const rawBet = args[1];
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ | নিয়ম: !roulette [bet_amount]");
-    if (bet > 50000000000) return message.reply("❌ | সর্বোচ্চ লিমিট $50 Billion!");
+    if (!choice || !["red", "black", "even", "odd"].includes(choice) || !rawBet) {
+      return message.reply("> 🎡\n• Usage: !roulette [red/black/even/odd] [bet]\n• Example: !roulette red 10m");
+    }
+
+    const parseBet = (input) => {
+      if (!input) return NaN;
+      const lower = input.toLowerCase();
+      if (lower.endsWith("k")) return parseFloat(lower) * 1000;
+      if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
+      if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
+      return parseInt(input);
+    };
+
+    const bet = parseBet(rawBet);
+    if (isNaN(bet) || bet <= 0) return message.reply("> 🎡\n• Please enter a valid bet amount!");
+    if (bet > 50000000000) return message.reply("> 🎡\n• Maximum bet limit is $50B!");
 
     let userData = await usersData.get(senderID);
-    let uData = userData.data || {};
-    let money = uData.money !== undefined ? uData.money : 10000000;
+    let currentMoney = typeof userData.money === "number" ? userData.money : (userData.data?.money || 0);
 
-    if (money < bet) return message.reply("❌ | পর্যাপ্ত ব্যালেন্স নেই!");
+    if (currentMoney < bet) return message.reply("> 🎡\n• Insufficient balance in your account!");
 
-    const multipliers = [0, 0, 0, 1.5, 2, 5];
-    const landedMultiplier = multipliers[Math.floor(Math.random() * multipliers.length)];
+    const landedNumber = Math.floor(Math.random() * 37); // 0 to 36
+    const isRed = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(landedNumber);
+    const color = landedNumber === 0 ? "green" : (isRed ? "red" : "black");
+    const parity = landedNumber % 2 === 0 ? "even" : "odd";
 
-    const isWin = landedMultiplier > 0;
-    const winAmount = Math.floor(bet * landedMultiplier);
-    const newBalance = isWin ? money + winAmount : money - bet;
+    let isWin = false;
+    if (choice === "red" && color === "red") isWin = true;
+    if (choice === "black" && color === "black") isWin = true;
+    if (choice === "even" && parity === "even" && landedNumber !== 0) isWin = true;
+    if (choice === "odd" && parity === "odd" && landedNumber !== 0) isWin = true;
 
-    uData.money = newBalance;
-    await usersData.set(senderID, { data: uData });
+    const winAmount = bet;
+    const newBalance = isWin ? currentMoney + winAmount : currentMoney - bet;
 
-    const canvas = createCanvas(800, 450);
-    const ctx = canvas.getContext("2d");
+    // Stats
+    if (!userData.data) userData.data = {};
+    if (!userData.data.rouletteStats) userData.data.rouletteStats = { wins: 0, total: 0 };
+    userData.data.rouletteStats.total += 1;
+    if (isWin) userData.data.rouletteStats.wins += 1;
 
-    ctx.fillStyle = isWin ? "#1a0f00" : "#120000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const totalGames = userData.data.rouletteStats.total;
+    const totalWins = userData.data.rouletteStats.wins;
+    const winRate = ((totalWins / totalGames) * 100).toFixed(1);
 
-    ctx.strokeStyle = isWin ? "#d35400" : "#c0392b";
-    ctx.lineWidth = 10;
-    ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+    // Database Permanent Save
+    userData.money = newBalance;
+    userData.data.money = newBalance;
+    await usersData.set(senderID, userData);
 
-    ctx.fillStyle = isWin ? "#e67e22" : "#e74c3c";
-    ctx.font = "bold 45px Sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(isWin ? "🎡 ROULETTES SPIN WIN 🎡" : "🎡 ROULETTE SPIN LOSS 🎡", 400, 80);
+    const formatMoney = (num) => {
+      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+      return num.toLocaleString();
+    };
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 45px Sans-serif";
-    ctx.fillText(`Landed on: [ ${landedMultiplier}x Multiplier ]`, 400, 170);
+    const colorEmoji = color === "red" ? "🔴 Red" : (color === "black" ? "⚫ Black" : "🟢 Green 0");
+    const statusMsg = isWin 
+      ? `• Jackpot Winner! You pocketed +$${formatMoney(winAmount)}`
+      : `• House Won! You lost -$${formatMoney(bet)}`;
 
-    ctx.font = "bold 32px Sans-serif";
-    ctx.fillStyle = isWin ? "#2ecc71" : "#e74c3c";
-    ctx.fillText(isWin ? `+ $${winAmount.toLocaleString()}` : `- $${bet.toLocaleString()}`, 400, 250);
+    const response = 
+      `> 🎡\n` +
+      `${statusMsg}\n` +
+      `• Ball Landed On: [ ${landedNumber} | ${colorEmoji} ]\n` +
+      `• Bet Pick: ${choice.toUpperCase()}\n\n` +
+      `🎯 Roulette Win Rate: ${winRate}% (${totalWins}/${totalGames})\n` +
+      `💳 Balance: $${formatMoney(newBalance)}`;
 
-    ctx.fillStyle = "#f1c40f";
-    ctx.font = "bold 28px Sans-serif";
-    ctx.fillText(`Total Balance: $${newBalance.toLocaleString()}`, 400, 330);
-
-    ctx.fillStyle = "#888888";
-    ctx.font = "italic 20px Sans-serif";
-    ctx.fillText("ROYAL ROULETTE WHEEL • DYNAMIC CARD", 400, 400);
-
-    const cardPath = path.join(__dirname, `cache_roulette_${senderID}.png`);
-    fs.writeFileSync(cardPath, canvas.toBuffer("image/png"));
-
-    const msg = isWin 
-      ? `🎡 | রুলেট চাকা ঘুরে ${landedMultiplier}x গুণ বোনাস পাওয়া গেছে!` 
-      : `🎡 | রুলেট চাকা জিরোতে থেমে গেছে, লস $${bet.toLocaleString()}`;
-
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cardPath)
-    }, () => {
-      if (fs.existsSync(cardPath)) fs.unlinkSync(cardPath);
-    });
+    return message.reply(response);
   }
 };
