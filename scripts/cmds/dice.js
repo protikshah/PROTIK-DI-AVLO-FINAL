@@ -1,12 +1,8 @@
-const { createCanvas } = require("canvas");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports = {
   config: {
     name: "dice",
     aliases: ["roll"],
-    version: "5.0",
+    version: "7.0",
     author: "Protik / Assistant",
     countDown: 3,
     role: 0,
@@ -17,75 +13,82 @@ module.exports = {
 
   onStart: async function ({ message, args, event, usersData }) {
     const { senderID } = event;
-    const bet = parseInt(args[0]);
+    const rawBet = args[0];
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ | Usage: !dice [bet_amount]");
-    if (bet > 50000000000) return message.reply("❌ | Maximum bet limit is $50 Billion!");
+    if (!rawBet) return message.reply("> 🎲\n• Usage: !dice [bet_amount]\n• Example: !dice 1m");
 
-    const money = await usersData.getMoney(senderID);
-    if (money < bet) return message.reply("❌ | Insufficient balance!");
+    const parseBet = (input) => {
+      if (!input) return NaN;
+      const lower = input.toLowerCase();
+      if (lower.endsWith("k")) return parseFloat(lower) * 1000;
+      if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
+      if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
+      return parseInt(input);
+    };
 
-    const userRoll = Math.floor(Math.random() * 6) + 1;
-    const botRoll = Math.floor(Math.random() * 6) + 1;
+    const bet = parseBet(rawBet);
+    if (isNaN(bet) || bet <= 0) return message.reply("> 🎲\n• Please enter a valid bet amount!");
+    if (bet > 50000000000) return message.reply("> 🎲\n• Maximum bet limit is $50B!");
+
+    let userData = await usersData.get(senderID);
+    let currentMoney = typeof userData.money === "number" ? userData.money : (userData.data?.money || 0);
+
+    if (currentMoney < bet) return message.reply("> 🎲\n• Insufficient balance in your account!");
+
+    const diceIcons = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+    const userRollIdx = Math.floor(Math.random() * 6);
+    const botRollIdx = Math.floor(Math.random() * 6);
+
+    const userRoll = userRollIdx + 1;
+    const botRoll = botRollIdx + 1;
 
     const isWin = userRoll > botRoll;
     const isDraw = userRoll === botRoll;
 
     let winAmount = 0;
-    let newBalance = money;
+    let newBalance = currentMoney;
 
     if (isWin) {
       winAmount = bet;
-      const updatedUser = await usersData.addMoney(senderID, winAmount);
-      newBalance = updatedUser.money;
+      newBalance = currentMoney + winAmount;
     } else if (!isDraw) {
-      const updatedUser = await usersData.subtractMoney(senderID, bet);
-      newBalance = updatedUser.money;
+      newBalance = currentMoney - bet;
     }
 
-    const canvas = createCanvas(800, 450);
-    const ctx = canvas.getContext("2d");
+    // Stats Management
+    if (!userData.data) userData.data = {};
+    if (!userData.data.diceStats) userData.data.diceStats = { wins: 0, total: 0 };
+    userData.data.diceStats.total += 1;
+    if (isWin) userData.data.diceStats.wins += 1;
 
-    ctx.fillStyle = isWin ? "#001a1a" : (isDraw ? "#1a1a1a" : "#1a0000");
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const totalGames = userData.data.diceStats.total;
+    const totalWins = userData.data.diceStats.wins;
+    const winRate = ((totalWins / totalGames) * 100).toFixed(1);
 
-    ctx.strokeStyle = isWin ? "#1abc9c" : (isDraw ? "#f39c12" : "#e74c3c");
-    ctx.lineWidth = 10;
-    ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+    // Save to Database permanently
+    userData.money = newBalance;
+    userData.data.money = newBalance;
+    await usersData.set(senderID, userData);
 
-    ctx.fillStyle = isWin ? "#1abc9c" : (isDraw ? "#f39c12" : "#e74c3c");
-    ctx.font = "bold 45px Sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(isWin ? "🎲 LUCKY DICE WIN 🎲" : (isDraw ? "🎲 DICE ROLL DRAW 🎲" : "🎲 DICE ROLL LOSS 🎲"), 400, 80);
+    const formatMoney = (num) => {
+      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+      return num.toLocaleString();
+    };
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 45px Sans-serif";
-    ctx.fillText(`You: 🎲 [ ${userRoll} ]    vs    Bot: 🎲 [ ${botRoll} ]`, 400, 170);
+    let statusMsg = "";
+    if (isWin) statusMsg = `• High Roll! You won +$${formatMoney(winAmount)}`;
+    else if (isDraw) statusMsg = `• Draw Match! No loss occurred`;
+    else statusMsg = `• Low Roll! You lost -$${formatMoney(bet)}`;
 
-    ctx.font = "bold 32px Sans-serif";
-    ctx.fillStyle = isWin ? "#2ecc71" : (isDraw ? "#f39c12" : "#e74c3c");
-    ctx.fillText(isWin ? `+ $${winAmount.toLocaleString()}` : (isDraw ? "NO PROFIT / NO LOSS" : `- $${bet.toLocaleString()}`), 400, 250);
+    const response = 
+      `> 🎲\n` +
+      `${statusMsg}\n` +
+      `• Roll Result: You [ ${diceIcons[userRollIdx]} ${userRoll} ] vs Bot [ ${diceIcons[botRollIdx]} ${botRoll} ]\n\n` +
+      `🎯 Dice Win Rate: ${winRate}% (${totalWins}/${totalGames})\n` +
+      `💳 Balance: $${formatMoney(newBalance)}`;
 
-    ctx.fillStyle = "#f1c40f";
-    ctx.font = "bold 28px Sans-serif";
-    ctx.fillText(`Total Balance: $${newBalance.toLocaleString()}`, 400, 330);
-
-    ctx.fillStyle = "#888888";
-    ctx.font = "italic 20px Sans-serif";
-    ctx.fillText("GOLDEN DICE CLUB • DYNAMIC CARD", 400, 400);
-
-    const cardPath = path.join(__dirname, `cache_dice_${senderID}.png`);
-    fs.writeFileSync(cardPath, canvas.toBuffer("image/png"));
-
-    const msg = isWin 
-      ? `🎲 | You won! Your roll was higher, $${winAmount.toLocaleString()} added to your account!` 
-      : (isDraw ? `🎲 | It's a draw! No money was deducted.` : `🎲 | You lost! Your roll was lower.`);
-
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cardPath)
-    }, () => {
-      if (fs.existsSync(cardPath)) fs.unlinkSync(cardPath);
-    });
+    return message.reply(response);
   }
 };
