@@ -40,7 +40,7 @@ module.exports = {
     const cardNum = `${targetID.slice(0, 4)} •••• •••• ${targetID.slice(-4)}`;
 
     const cardResponse = 
-      `┌──────────────────────────┐\n` +
+      `┌─────────────────────┐\n` +
       `│ 💳  DI-ABLO BANK OF JISOO    │\n` +
       `│ ░░░░  [ CHIP ]   VIP     │\n` +
       `│                          │\n` +
@@ -48,7 +48,7 @@ module.exports = {
       `│  HOLDER : ${name.toUpperCase().slice(0, 16)}   │\n` +
       `│                          │\n` +
       `│  BALANCE : $${formatMoney(currentMoney)}           │\n` +
-      `└──────────────────────────┘\n` +
+      `└─────────────────────┘\n` +
       `> 🏛️ Vault Status: Secure & Active`;
 
     return message.reply(cardResponse);
