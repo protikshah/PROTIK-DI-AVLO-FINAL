@@ -1,85 +1,41 @@
 module.exports = {
   config: {
     name: "sendmoney",
-    aliases: ["pay", "transfer", "paymoney"],
-    version: "7.0",
+    aliases: ["pay", "givemoney", "transfer"],
+    version: "2.0",
     author: "Protik / Assistant",
     countDown: 5,
     role: 0,
-    shortDescription: { en: "Transfer money to another user" },
+    shortDescription: { en: "Send money to another user" },
     category: "economy",
-    guide: { en: "{pn} [reply/mention/UID] [amount]" }
+    guide: { en: "{pn} [@mention / reply / UID] [amount]" }
   },
 
-  onStart: async function ({ message, args, event, usersData }) {
-    const senderID = event.senderID;
-    let receiverID = null;
-    let amountInput = null;
+  onStart: async function ({ message, event, args, usersData }) {
+    const { senderID, mentions, messageReply } = event;
 
-    if (Object.keys(event.mentions).length > 0) {
-      receiverID = Object.keys(event.mentions)[0];
-      amountInput = args[1];
-    } else if (event.type === "message_reply") {
-      receiverID = event.messageReply.senderID;
-      amountInput = args[0];
-    } else if (args.length >= 2 && !isNaN(args[0])) {
-      receiverID = args[0];
-      amountInput = args[1];
-    }
+    // Helper to parse inputs like 5k, 1m, 2b to actual numbers
+    const parseAmount = (str) => {
+      if (!str) return NaN;
+      let numStr = str.toLowerCase().trim();
+      let multiplier = 1;
 
-    if (!receiverID || !amountInput) {
-      return message.reply("> 💸\n• Usage: !pay [reply/mention/UID] [amount]\n• Example: !pay @friend 5m");
-    }
+      if (numStr.endsWith("k")) {
+        multiplier = 1000;
+        numStr = numStr.slice(0, -1);
+      } else if (numStr.endsWith("m")) {
+        multiplier = 1000000;
+        numStr = numStr.slice(0, -1);
+      } else if (numStr.endsWith("b")) {
+        multiplier = 1000000000;
+        numStr = numStr.slice(0, -1);
+      }
 
-    if (receiverID === senderID) {
-      return message.reply("> 💸\n• You cannot send money to yourself!");
-    }
-
-    const parseAmount = (input) => {
-      if (!input) return NaN;
-      const lower = input.toLowerCase();
-      if (lower.endsWith("k")) return parseFloat(lower) * 1000;
-      if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
-      if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
-      return parseInt(input);
+      const val = parseFloat(numStr);
+      return isNaN(val) ? NaN : Math.floor(val * multiplier);
     };
 
-    const transferAmount = parseAmount(amountInput);
-    if (isNaN(transferAmount) || transferAmount <= 0) {
-      return message.reply("> 💸\n• Please enter a valid transfer amount!");
-    }
-
-    // Sender Data Check
-    let senderData = await usersData.get(senderID);
-    let senderMoney = typeof senderData.money === "number" ? senderData.money : (senderData.data?.money || 0);
-
-    if (senderMoney < transferAmount) {
-      return message.reply("> 💸\n• Insufficient funds to complete this transfer!");
-    }
-
-    // Receiver Data Check
-    let receiverData = await usersData.get(receiverID);
-    if (!receiverData) {
-      return message.reply("> 💸\n• Receiver profile not found in database!");
-    }
-    let receiverMoney = typeof receiverData.money === "number" ? receiverData.money : (receiverData.data?.money || 0);
-
-    // Balance Updates
-    const newSenderBalance = senderMoney - transferAmount;
-    const newReceiverBalance = receiverMoney + transferAmount;
-
-    // Save Sender Data Permanently
-    senderData.money = newSenderBalance;
-    if (!senderData.data) senderData.data = {};
-    senderData.data.money = newSenderBalance;
-    await usersData.set(senderID, senderData);
-
-    // Save Receiver Data Permanently
-    receiverData.money = newReceiverBalance;
-    if (!receiverData.data) receiverData.data = {};
-    receiverData.data.money = newReceiverBalance;
-    await usersData.set(receiverID, receiverData);
-
+    // Helper to format money for output
     const formatMoney = (num) => {
       if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
       if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
@@ -87,15 +43,77 @@ module.exports = {
       return num.toLocaleString();
     };
 
-    const receiverName = await usersData.getName(receiverID);
+    let receiverID = null;
+    let amountRaw = null;
 
-    const response = 
-      `> 💸\n` +
-      `• Money Transfer Successful!\n` +
+    // 1. If replied to a message
+    if (messageReply) {
+      receiverID = messageReply.senderID;
+      amountRaw = args[0];
+    } 
+    // 2. If mentioned a user
+    else if (Object.keys(mentions).length > 0) {
+      receiverID = Object.keys(mentions)[0];
+      // Take the last argument as amount (handles names with spaces)
+      amountRaw = args[args.length - 1];
+    } 
+    // 3. If passed UID directly
+    else if (args.length >= 2 && !isNaN(args[0])) {
+      receiverID = args[0];
+      amountRaw = args[1];
+    }
+
+    if (!receiverID || !amountRaw) {
+      return message.reply(
+        `> 💸\n` +
+        `• Usage: #sendmoney [@mention / reply / UID] [amount]\n` +
+        `• Example: #sendmoney @friend 10000 or #sendmoney 5m`
+      );
+    }
+
+    if (receiverID === senderID) {
+      return message.reply("> ⚠️\n• আপনি নিজেকে টাকা পাঠাতে পারবেন না!");
+    }
+
+    const amount = parseAmount(amountRaw);
+
+    if (isNaN(amount) || amount <= 0) {
+      return message.reply("> 💸\n• Please enter a valid transfer amount!");
+    }
+
+    // Fetch Sender Data
+    let senderData = await usersData.get(senderID);
+    let senderBalance = typeof senderData.money === "number" ? senderData.money : (senderData.data?.money || 0);
+
+    if (senderBalance < amount) {
+      return message.reply(`> ❌\n• আপনার অ্যাকাউন্টে পর্যাপ্ত টাকা নেই!\n• বর্তমান ব্যালেন্স: $${formatMoney(senderBalance)}`);
+    }
+
+    // Fetch Receiver Data
+    let receiverData = await usersData.get(receiverID);
+    let receiverBalance = typeof receiverData.money === "number" ? receiverData.money : (receiverData.data?.money || 0);
+
+    // Update Balances
+    const newSenderBalance = senderBalance - amount;
+    const newReceiverBalance = receiverBalance + amount;
+
+    senderData.money = newSenderBalance;
+    if (senderData.data) senderData.data.money = newSenderBalance;
+
+    receiverData.money = newReceiverBalance;
+    if (receiverData.data) receiverData.data.money = newReceiverBalance;
+
+    // Save to database
+    await usersData.set(senderID, senderData);
+    await usersData.set(receiverID, receiverData);
+
+    const receiverName = receiverData.name || "ইউজার";
+
+    return message.reply(
+      `> 💸  [ TRANSFER SUCCESSFUL ]  💸\n\n` +
       `• Sent To: ${receiverName}\n` +
-      `• Amount Transferred: $${formatMoney(transferAmount)}\n\n` +
-      `💳 Remaining Balance: $${formatMoney(newSenderBalance)}`;
-
-    return message.reply(response);
+      `• Amount Transferred: $${formatMoney(amount)}\n` +
+      `• Your New Balance: $${formatMoney(newSenderBalance)}`
+    );
   }
 };
