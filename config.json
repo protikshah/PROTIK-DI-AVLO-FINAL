@@ -31,7 +31,7 @@
   "prefix": "#",
   "database": {
     "type": "mongodb",
-    "uriMongodb": "YOUR_MONGODB_URI_HERE",
+    "uriMongodb": "mongodb+srv://protikshah573_db_user:<db_password>@cluster0.wtdc1wv.mongodb.net/?appName=Cluster0",
     "autoSyncWhenStart": true,
     "autoRefreshThreadInfoFirstTime": true,
     "notes": "(1) type selects 'json' or 'sqlite' or 'mongodb'. If you choose mongodb, enter uri connect mongodb in the uriMongodb section"
