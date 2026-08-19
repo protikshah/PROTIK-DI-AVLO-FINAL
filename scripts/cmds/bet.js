@@ -1,12 +1,8 @@
-const { createCanvas } = require("canvas");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports = {
   config: {
     name: "bet",
     aliases: ["qbet"],
-    version: "5.0",
+    version: "7.0",
     author: "Protik / Assistant",
     countDown: 3,
     role: 0,
@@ -17,69 +13,67 @@ module.exports = {
 
   onStart: async function ({ message, args, event, usersData }) {
     const { senderID } = event;
-    const bet = parseInt(args[0]);
+    const rawBet = args[0];
 
-    if (isNaN(bet) || bet <= 0) return message.reply("❌ | Usage: !bet [bet_amount]");
-    if (bet > 50000000000) return message.reply("❌ | Maximum bet limit is $50 Billion!");
+    if (!rawBet) return message.reply("> 👑\n• Usage: !bet [bet_amount]\n• Example: !bet 2m");
 
-    const money = await usersData.getMoney(senderID);
-    if (money < bet) return message.reply("❌ | Insufficient balance!");
+    const parseBet = (input) => {
+      if (!input) return NaN;
+      const lower = input.toLowerCase();
+      if (lower.endsWith("k")) return parseFloat(lower) * 1000;
+      if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
+      if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
+      return parseInt(input);
+    };
+
+    const bet = parseBet(rawBet);
+    if (isNaN(bet) || bet <= 0) return message.reply("> 👑\n• Please enter a valid bet amount!");
+    if (bet > 50000000000) return message.reply("> 👑\n• Maximum bet limit is $50B!");
+
+    let userData = await usersData.get(senderID);
+    let currentMoney = typeof userData.money === "number" ? userData.money : (userData.data?.money || 0);
+
+    if (currentMoney < bet) return message.reply("> 👑\n• Insufficient balance in your account!");
 
     const isWin = Math.random() < 0.50;
     const winAmount = bet;
-    let newBalance;
+    const newBalance = isWin ? currentMoney + winAmount : currentMoney - bet;
 
-    if (isWin) {
-      const updatedUser = await usersData.addMoney(senderID, winAmount);
-      newBalance = updatedUser.money;
-    } else {
-      const updatedUser = await usersData.subtractMoney(senderID, bet);
-      newBalance = updatedUser.money;
-    }
+    // Stats Management
+    if (!userData.data) userData.data = {};
+    if (!userData.data.betStats) userData.data.betStats = { wins: 0, total: 0 };
+    userData.data.betStats.total += 1;
+    if (isWin) userData.data.betStats.wins += 1;
 
-    const canvas = createCanvas(800, 450);
-    const ctx = canvas.getContext("2d");
+    const totalGames = userData.data.betStats.total;
+    const totalWins = userData.data.betStats.wins;
+    const winRate = ((totalWins / totalGames) * 100).toFixed(1);
 
-    ctx.fillStyle = isWin ? "#1a1600" : "#18001a";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Save to Database permanently
+    userData.money = newBalance;
+    userData.data.money = newBalance;
+    await usersData.set(senderID, userData);
 
-    ctx.strokeStyle = isWin ? "#f39c12" : "#9b59b6";
-    ctx.lineWidth = 10;
-    ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+    const formatMoney = (num) => {
+      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+      return num.toLocaleString();
+    };
 
-    ctx.fillStyle = isWin ? "#f39c12" : "#9b59b6";
-    ctx.font = "bold 45px Sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(isWin ? "💵 QUICK BET WIN 💵" : "💥 BET BUSTED 💥", 400, 80);
+    const statusMsg = isWin 
+      ? `• Lucky Choice! You doubled +$${formatMoney(winAmount)}`
+      : `• Bad Luck! You lost -$${formatMoney(bet)}`;
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 40px Sans-serif";
-    ctx.fillText(isWin ? "💰 CASH MULTIPLIER 2x!" : "💸 INVESTMENT LOST!", 400, 170);
+    const iconResult = isWin ? "[ 💸 | 💎 | 💵 ]" : "[ 💣 | 💥 | 💀 ]";
 
-    ctx.font = "bold 32px Sans-serif";
-    ctx.fillStyle = isWin ? "#2ecc71" : "#e74c3c";
-    ctx.fillText(isWin ? `+ $${winAmount.toLocaleString()}` : `- $${bet.toLocaleString()}`, 400, 250);
+    const response = 
+      `> 👑\n` +
+      `${statusMsg}\n` +
+      `• Bet Multiplier: ${iconResult}\n\n` +
+      `🎯 Bet Win Rate: ${winRate}% (${totalWins}/${totalGames})\n` +
+      `💳 Balance: $${formatMoney(newBalance)}`;
 
-    ctx.fillStyle = "#f1c40f";
-    ctx.font = "bold 28px Sans-serif";
-    ctx.fillText(`Total Balance: $${newBalance.toLocaleString()}`, 400, 330);
-
-    ctx.fillStyle = "#888888";
-    ctx.font = "italic 20px Sans-serif";
-    ctx.fillText("HIGH FREQUENCY BETTING • DYNAMIC CARD", 400, 400);
-
-    const cardPath = path.join(__dirname, `cache_bet_${senderID}.png`);
-    fs.writeFileSync(cardPath, canvas.toBuffer("image/png"));
-
-    const msg = isWin 
-      ? `💥 | Awesome! You won the bet and received $${winAmount.toLocaleString()} cash!` 
-      : `💥 | Oof! Bad luck, you lost $${bet.toLocaleString()}!`;
-
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cardPath)
-    }, () => {
-      if (fs.existsSync(cardPath)) fs.unlinkSync(cardPath);
-    });
+    return message.reply(response);
   }
 };
