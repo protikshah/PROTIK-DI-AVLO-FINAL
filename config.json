@@ -31,7 +31,7 @@
   "prefix": "#",
   "database": {
     "type": "mongodb",
-    "uriMongodb": "mongodb+srv://hakersala1010_db_user:MMppProtik@cluster0.xkneabg.mongodb.net/?appName=Cluster0",
+    "uriMongodb": "mongodb+srv://hakersala1010_db_user:Password123456@cluster0.xkneabg.mongodb.net/myBotDB?appName=Cluster0",
     "autoSyncWhenStart": true,
     "autoRefreshThreadInfoFirstTime": true,
     "notes": "(1) type selects 'json' or 'sqlite' or 'mongodb'. If you choose mongodb, enter uri connect mongodb in the uriMongodb section"
