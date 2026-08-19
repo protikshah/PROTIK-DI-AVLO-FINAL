@@ -1,109 +1,114 @@
-const { createCanvas } = require("canvas");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports = {
   config: {
     name: "rps",
     aliases: ["rockpaperscissors"],
-    version: "5.0",
+    version: "7.0",
     author: "Protik / Assistant",
     countDown: 3,
     role: 0,
-    shortDescription: { en: "Rock Paper Scissors with card" },
+    shortDescription: { en: "Rock Paper Scissors Duel" },
     category: "games",
     guide: { en: "{pn} [rock/paper/scissors] [bet_amount]" }
   },
 
   onStart: async function ({ message, args, event, usersData }) {
     const { senderID } = event;
-    const choice = args[0] ? args[0].toLowerCase() : "";
-    const bet = parseInt(args[1]);
+    const userPick = args[0] ? args[0].toLowerCase() : null;
+    const rawBet = args[1];
 
-    const validChoices = ["rock", "paper", "scissors"];
-    if (!validChoices.includes(choice) || isNaN(bet) || bet <= 0) {
-      return message.reply("❌ | নিয়ম: !rps [rock/paper/scissors] [bet_amount]");
+    const validPicks = {
+      rock: "✊ Rock",
+      r: "✊ Rock",
+      paper: "🖐️ Paper",
+      p: "🖐️ Paper",
+      scissors: "✌️ Scissors",
+      s: "✌️ Scissors"
+    };
+
+    if (!userPick || !validPicks[userPick] || !rawBet) {
+      return message.reply("> ✂️\n• Usage: !rps [rock/paper/scissors] [bet]\n• Example: !rps rock 2m");
     }
-    if (bet > 50000000000) return message.reply("❌ | সর্বোচ্চ লিমিট $50 Billion!");
+
+    const parseBet = (input) => {
+      if (!input) return NaN;
+      const lower = input.toLowerCase();
+      if (lower.endsWith("k")) return parseFloat(lower) * 1000;
+      if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
+      if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
+      return parseInt(input);
+    };
+
+    const bet = parseBet(rawBet);
+    if (isNaN(bet) || bet <= 0) return message.reply("> ✂️\n• Please enter a valid bet amount!");
+    if (bet > 50000000000) return message.reply("> ✂️\n• Maximum bet limit is $50B!");
 
     let userData = await usersData.get(senderID);
-    let uData = userData.data || {};
-    let money = uData.money !== undefined ? uData.money : 10000000;
+    let currentMoney = typeof userData.money === "number" ? userData.money : (userData.data?.money || 0);
 
-    if (money < bet) return message.reply("❌ | পর্যাপ্ত ব্যালেন্স নেই!");
+    if (currentMoney < bet) return message.reply("> ✂️\n• Insufficient balance in your account!");
 
-    const botChoice = validChoices[Math.floor(Math.random() * validChoices.length)];
+    const choices = ["rock", "paper", "scissors"];
+    const botChoiceKey = choices[Math.floor(Math.random() * choices.length)];
+    
+    const userChoiceKey = userPick.startsWith("r") ? "rock" : (userPick.startsWith("p") ? "paper" : "scissors");
 
-    let result = "draw";
-    if (
-      (choice === "rock" && botChoice === "scissors") ||
-      (choice === "paper" && botChoice === "rock") ||
-      (choice === "scissors" && botChoice === "paper")
+    let isWin = false;
+    let isDraw = false;
+
+    if (userChoiceKey === botChoiceKey) {
+      isDraw = true;
+    } else if (
+      (userChoiceKey === "rock" && botChoiceKey === "scissors") ||
+      (userChoiceKey === "paper" && botChoiceKey === "rock") ||
+      (userChoiceKey === "scissors" && botChoiceKey === "paper")
     ) {
-      result = "win";
-    } else if (choice !== botChoice) {
-      result = "lose";
+      isWin = true;
     }
 
-    const isWin = result === "win";
-    const isDraw = result === "draw";
-
+    let newBalance = currentMoney;
     let winAmount = 0;
-    let newBalance = money;
 
     if (isWin) {
       winAmount = bet;
-      newBalance = money + winAmount;
+      newBalance = currentMoney + winAmount;
     } else if (!isDraw) {
-      newBalance = money - bet;
+      newBalance = currentMoney - bet;
     }
 
-    uData.money = newBalance;
-    await usersData.set(senderID, { data: uData });
+    // Stats
+    if (!userData.data) userData.data = {};
+    if (!userData.data.rpsStats) userData.data.rpsStats = { wins: 0, total: 0 };
+    userData.data.rpsStats.total += 1;
+    if (isWin) userData.data.rpsStats.wins += 1;
 
-    const canvas = createCanvas(800, 450);
-    const ctx = canvas.getContext("2d");
+    const totalGames = userData.data.rpsStats.total;
+    const totalWins = userData.data.rpsStats.wins;
+    const winRate = ((totalWins / totalGames) * 100).toFixed(1);
 
-    ctx.fillStyle = isWin ? "#001a0d" : (isDraw ? "#1a1a1a" : "#1a001a");
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Database Permanent Save
+    userData.money = newBalance;
+    userData.data.money = newBalance;
+    await usersData.set(senderID, userData);
 
-    ctx.strokeStyle = isWin ? "#27ae60" : (isDraw ? "#f39c12" : "#8e44ad");
-    ctx.lineWidth = 10;
-    ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+    const formatMoney = (num) => {
+      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
+      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+      return num.toLocaleString();
+    };
 
-    ctx.fillStyle = isWin ? "#2ecc71" : (isDraw ? "#f39c12" : "#9b59b6");
-    ctx.font = "bold 45px Sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(isWin ? "✂️ RPS VICTORY ✂️" : (isDraw ? "✂️ RPS DRAW ✂️" : "✂️ RPS DEFEAT ✂️"), 400, 80);
+    let statusMsg = "";
+    if (isWin) statusMsg = `• Master Move! You won +$${formatMoney(winAmount)}`;
+    else if (isDraw) statusMsg = `• Equal Match! Tie - Money refunded`;
+    else statusMsg = `• Defeated! You lost -$${formatMoney(bet)}`;
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 40px Sans-serif";
-    ctx.fillText(`You: [ ${choice.toUpperCase()} ] vs Bot: [ ${botChoice.toUpperCase()} ]`, 400, 170);
+    const response = 
+      `> ✂️\n` +
+      `${statusMsg}\n` +
+      `• Duel: You [ ${validPicks[userChoiceKey]} ] vs Bot [ ${validPicks[botChoiceKey]} ]\n\n` +
+      `🎯 RPS Win Rate: ${winRate}% (${totalWins}/${totalGames})\n` +
+      `💳 Balance: $${formatMoney(newBalance)}`;
 
-    ctx.font = "bold 32px Sans-serif";
-    ctx.fillStyle = isWin ? "#2ecc71" : (isDraw ? "#f39c12" : "#e74c3c");
-    ctx.fillText(isWin ? `+ $${winAmount.toLocaleString()}` : (isDraw ? "MATCH DRAWN" : `- $${bet.toLocaleString()}`), 400, 250);
-
-    ctx.fillStyle = "#f1c40f";
-    ctx.font = "bold 28px Sans-serif";
-    ctx.fillText(`Total Balance: $${newBalance.toLocaleString()}`, 400, 330);
-
-    ctx.fillStyle = "#888888";
-    ctx.font = "italic 20px Sans-serif";
-    ctx.fillText("CYBER RPS DUEL • DYNAMIC CARD", 400, 400);
-
-    const cardPath = path.join(__dirname, `cache_rps_${senderID}.png`);
-    fs.writeFileSync(cardPath, canvas.toBuffer("image/png"));
-
-    const msg = isWin 
-      ? `✂️ | দুর্দান্ত চাল! জিতছেন $${winAmount.toLocaleString()}` 
-      : (isDraw ? `✂️ | ম্যাচ ড্র হয়েছে!` : `✂️ | হেরে গেছেন!`);
-
-    return message.reply({
-      body: msg,
-      attachment: fs.createReadStream(cardPath)
-    }, () => {
-      if (fs.existsSync(cardPath)) fs.unlinkSync(cardPath);
-    });
+    return message.reply(response);
   }
 };
