@@ -5,7 +5,7 @@ module.exports.config = {
     credits: "Pratik Shah",
     description: "১ থেকে ১০ এর মধ্যে সংখ্যা ধরে বাজি ধরুন",
     commandCategory: "games",
-    usages: "!number <১-১০ সংখ্যা> <বাজির পরিমাণ>",
+    category: "games",
     cooldowns: 5
 };
 
