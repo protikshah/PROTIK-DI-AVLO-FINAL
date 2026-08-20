@@ -1,7 +1,7 @@
 module.exports = {
   config: {
     name: "bal",
-    aliases: ["money", "balance", "card"],
+    aliases: ["money", "balance", "cd"],
     version: "7.0",
     author: "Protik / Assistant",
     countDown: 3,
