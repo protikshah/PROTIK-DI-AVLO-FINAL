@@ -2,19 +2,21 @@ module.exports.config = {
     name: "rob",
     aliases: ["steal"],
     version: "1.0.0",
-    hasPermssion: 0,
-    credits: "Pratik Shah",
+    role: 0,
+    credits: "Protik Shah",
     description: "অন্য ইউজারের অ্যাকাউন্ট থেকে কয়েন চুরি করার চেষ্টা করুন",
-    commandCategory: "games",
     category: "games",
-    cooldowns: 30
+    guide: {
+        en: "{pref}rob @mention"
+    },
+    countDown: 30
 };
 
-module.exports.run = async function({ api, event, args, Currencies }) {
+module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID, mentions } = event;
     const mentionKeys = Object.keys(mentions);
 
-    if (mentionKeys.length === 0) return api.sendMessage("❌ [SYSTEM]: যাকে চুরি করতে চান তাকে মেনশন করুন!\nউদাহরণ: !rob @friend", threadID, messageID);
+    if (mentionKeys.length === 0) return api.sendMessage("❌ [SYSTEM]: যাকে চুরি করতে চান তাকে মেনশন করুন!\nউদাহরণ: #rob @friend", threadID, messageID);
 
     const victimID = mentionKeys[0];
     const victimName = mentions[victimID].replace("@", "");
