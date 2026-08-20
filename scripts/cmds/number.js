@@ -1,20 +1,22 @@
 module.exports.config = {
     name: "number",
     version: "1.0.0",
-    hasPermssion: 0,
-    credits: "Pratik Shah",
+    role: 0,
+    credits: "Protik Shah",
     description: "১ থেকে ১০ এর মধ্যে সংখ্যা ধরে বাজি ধরুন",
-    commandCategory: "games",
     category: "games",
-    cooldowns: 5
+    guide: {
+        en: "{pref}number <১-১০ সংখ্যা> <বাজির পরিমাণ>"
+    },
+    countDown: 5
 };
 
-module.exports.run = async function({ api, event, args, Currencies }) {
+module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
     const guess = parseInt(args[0]);
     const bet = parseInt(args[1]);
 
-    if (isNaN(guess) || guess < 1 || guess > 10) return api.sendMessage("❌ [SYSTEM]: ১ থেকে ১০ এর মধ্যে একটি সংখ্যা দিন।\nউদাহরণ: !number 7 100", threadID, messageID);
+    if (isNaN(guess) || guess < 1 || guess > 10) return api.sendMessage("❌ [SYSTEM]: ১ থেকে ১০ এর মধ্যে একটি সংখ্যা দিন।\nউদাহরণ: #number 7 100", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ লিখুন।", threadID, messageID);
 
     let userMoney = (await Currencies.getData(senderID)).money || 0;
