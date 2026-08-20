@@ -1,11 +1,11 @@
 module.exports.config = {
-    name: "card",
+    name: "card2",
     version: "1.0.0",
     hasPermssion: 0,
-    credits: "Protik Shah",
+    credits: "Pratik Shah",
     description: "হাই/লো কার্ড বাজি ধরুন",
     commandCategory: "games",
-    usages: "!card <high/low> <বাজি>",
+    category: "games",
     cooldowns: 5
 };
 
