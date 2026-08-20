@@ -6,7 +6,7 @@ module.exports.config = {
     credits: "Pratik Shah",
     description: "অন্য ইউজারের অ্যাকাউন্ট থেকে কয়েন চুরি করার চেষ্টা করুন",
     commandCategory: "games",
-    usages: "!rob @mention",
+    category: "games",
     cooldowns: 30
 };
 
@@ -25,9 +25,9 @@ module.exports.run = async function({ api, event, args, Currencies }) {
     let victimMoney = (await Currencies.getData(victimID)).money || 0;
 
     if (victimMoney < 200) return api.sendMessage(`❌ [SYSTEM]: ${victimName}-এর পকেটে পর্যাপ্ত কয়েন নেই (কমপক্ষে $২০০ লাগবে)।`, threadID, messageID);
-    if (robberMoney < 100) return api.sendMessage(`❌ [SYSTEM]: চুরি করতে গিয়ে ধরা খেলে জরিমানার দেওয়ার মতো $১০০ কয়েনও আপনার নেই`, threadID, messageID);
+    if (robberMoney < 100) return api.sendMessage(`❌ [SYSTEM]: চুরি করতে গিয়ে ধরা খেলে জরিমানা দেওয়ার মতো $১০০ কয়েনও আপনার নেই!`, threadID, messageID);
 
-    const isSuccess = Math.random() < 0.45; // ৪৫% সফলতার সুযোগ
+    const isSuccess = Math.random() < 0.45;
     let msg = `==========================\n`;
     msg += `    🕵️ HEIST OPERATION 🕵️\n`;
     msg += `==========================\n`;
@@ -35,7 +35,7 @@ module.exports.run = async function({ api, event, args, Currencies }) {
     msg += `--------------------------\n`;
 
     if (isSuccess) {
-        const stolenAmount = Math.floor(Math.random() * (victimMoney * 0.3)) + 50; // সর্বোচ্চ ৩০% চুরি
+        const stolenAmount = Math.floor(Math.random() * (victimMoney * 0.3)) + 50;
         await Currencies.decreaseMoney(victimID, stolenAmount);
         await Currencies.increaseMoney(senderID, stolenAmount);
         msg += `✅ মিশন সফল! আপনি চুপিচুপি $${stolenAmount} কয়েন হাতিয়ে নিয়েছেন! 🤑\n`;
