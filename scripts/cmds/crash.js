@@ -1,20 +1,22 @@
 module.exports.config = {
     name: "crash",
     version: "1.0.0",
-    hasPermssion: 0,
+    role: 0,
     credits: "Pratik Shah",
     description: "রকেট ক্র্যাশ করার আগে মাল্টিপ্লায়ারে ক্যাশআউট করুন",
-    commandCategory: "games",
     category: "games",
-    cooldowns: 10
+    guide: {
+        en: "{pref}crash <টার্গেট যেমন: 1.5/2.0> <বাজি>"
+    },
+    countDown: 10
 };
 
-module.exports.run = async function({ api, event, args, Currencies }) {
+module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
     const targetMulti = parseFloat(args[0]);
     const bet = parseInt(args[1]);
 
-    if (isNaN(targetMulti) || targetMulti < 1.1) return api.sendMessage("❌ [SYSTEM]: সর্বনিম্ন মাল্টিপ্লায়ার 1.1 দিতে হবে।\nউদাহরণ: !crash 2.5 300", threadID, messageID);
+    if (isNaN(targetMulti) || targetMulti < 1.1) return api.sendMessage("❌ [SYSTEM]: সর্বনিম্ন মাল্টিপ্লায়ার 1.1 দিতে হবে।\nউদাহরণ: #crash 2.5 300", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
 
     let userMoney = (await Currencies.getData(senderID)).money || 0;
