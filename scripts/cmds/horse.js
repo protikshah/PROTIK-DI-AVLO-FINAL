@@ -1,20 +1,22 @@
 module.exports.config = {
     name: "horse",
     version: "1.0.0",
-    hasPermssion: 0,
+    role: 0,
     credits: "Pratik Shah",
     description: "রেস ট্র্যাকে ঘোড়ায় বাজি ধরুন",
-    commandCategory: "games",
     category: "games",
-    cooldowns: 15
+    guide: {
+        en: "{pref}horse <ঘোড়া নম্বর ১-৪> <বাজি>"
+    },
+    countDown: 15
 };
 
-module.exports.run = async function({ api, event, args, Currencies }) {
+module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
     const chosenHorse = parseInt(args[0]);
     const bet = parseInt(args[1]);
 
-    if (isNaN(chosenHorse) || chosenHorse < 1 || chosenHorse > 4) return api.sendMessage("❌ [SYSTEM]: ১ থেকে ৪ নম্বর ঘোড়ার যেকোনো একটি বেছে নিন।\nউদাহরণ: !horse 3 500", threadID, messageID);
+    if (isNaN(chosenHorse) || chosenHorse < 1 || chosenHorse > 4) return api.sendMessage("❌ [SYSTEM]: ১ থেকে ৪ নম্বর ঘোড়ার যেকোনো একটি বেছে নিন।\nউদাহরণ: #horse 3 500", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
 
     let userMoney = (await Currencies.getData(senderID)).money || 0;
