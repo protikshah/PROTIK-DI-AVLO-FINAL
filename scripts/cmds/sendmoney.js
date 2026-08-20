@@ -1,7 +1,7 @@
 module.exports = {
   config: {
     name: "sendmoney",
-    aliases: ["pay", "givemoney", "transfer"],
+    aliases: ["pay"],
     version: "2.0",
     author: "Protik / Assistant",
     countDown: 5,
