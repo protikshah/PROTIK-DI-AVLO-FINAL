@@ -1,20 +1,22 @@
 module.exports.config = {
     name: "chest",
     version: "1.0.0",
-    hasPermssion: 0,
-    credits: "Pratik Shah",
+    role: 0,
+    credits: "Protik Shah",
     description: "ভাগ্যপরীক্ষা করে রহস্যময় বাক্স আনলক করুন",
-    commandCategory: "games",
     category: "games",
-    cooldowns: 10
+    guide: {
+        en: "{pref}chest <১/২/৩ বাক্স নম্বর> <বাজি>"
+    },
+    countDown: 10
 };
 
-module.exports.run = async function({ api, event, args, Currencies }) {
+module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
     const choice = parseInt(args[0]);
     const bet = parseInt(args[1]);
 
-    if (isNaN(choice) || choice < 1 || choice > 3) return api.sendMessage("❌ [SYSTEM]: ১, ২ অথবা ৩ নম্বর বাক্সের যেকোনো একটি বেছে নিন।\nউদাহরণ: !chest 2 500", threadID, messageID);
+    if (isNaN(choice) || choice < 1 || choice > 3) return api.sendMessage("❌ [SYSTEM]: ১, ২ অথবা ৩ নম্বর বাক্সের যেকোনো একটি বেছে নিন।\nউদাহরণ: #chest 2 500", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
 
     let userMoney = (await Currencies.getData(senderID)).money || 0;
