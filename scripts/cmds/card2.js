@@ -1,20 +1,22 @@
 module.exports.config = {
-    name: "card2",
+    name: "card",
     version: "1.0.0",
-    hasPermssion: 0,
+    role: 0,
     credits: "Pratik Shah",
     description: "হাই/লো কার্ড বাজি ধরুন",
-    commandCategory: "games",
     category: "games",
-    cooldowns: 5
+    guide: {
+        en: "{pref}card <high/low> <বাজি>"
+    },
+    countDown: 5
 };
 
-module.exports.run = async function({ api, event, args, Currencies }) {
+module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
     const { threadID, messageID, senderID } = event;
     const predict = args[0] ? args[0].toLowerCase() : "";
     const bet = parseInt(args[1]);
 
-    if (predict !== "high" && predict !== "low") return api.sendMessage("❌ [SYSTEM]: High অথবা Low বেছে নিন।\nউদাহরণ: !card high 200", threadID, messageID);
+    if (predict !== "high" && predict !== "low") return api.sendMessage("❌ [SYSTEM]: High অথবা Low বেছে নিন।\nউদাহরণ: #card high 200", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
 
     let userMoney = (await Currencies.getData(senderID)).money || 0;
