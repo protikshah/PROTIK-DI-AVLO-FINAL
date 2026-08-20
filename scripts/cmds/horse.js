@@ -11,7 +11,7 @@ module.exports.config = {
     countDown: 15
 };
 
-module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
+module.exports.onStart = async function({ api, event, args, usersData }) {
     const { threadID, messageID, senderID } = event;
     const chosenHorse = parseInt(args[0]);
     const bet = parseInt(args[1]);
@@ -19,10 +19,12 @@ module.exports.onStart = async function({ api, event, args, Users, Currencies })
     if (isNaN(chosenHorse) || chosenHorse < 1 || chosenHorse > 4) return api.sendMessage("❌ [SYSTEM]: ১ থেকে ৪ নম্বর ঘোড়ার যেকোনো একটি বেছে নিন।\nউদাহরণ: #horse 3 500", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
 
-    let userMoney = (await Currencies.getData(senderID)).money || 0;
+    let userData = await usersData.get(senderID);
+    let userMoney = userData.money || 0;
+
     if (bet > userMoney) return api.sendMessage(`❌ [SYSTEM]: আপনার কাছে পর্যাপ্ত কয়েন নেই!`, threadID, messageID);
 
-    await Currencies.decreaseMoney(senderID, bet);
+    await usersData.set(senderID, { money: userMoney - bet });
 
     const horses = ["⚡ Thunder", "🔥 Blaze", "🌪️ Shadow", "🚀 Rocket"];
     const winningIndex = Math.floor(Math.random() * 4);
@@ -44,7 +46,8 @@ module.exports.onStart = async function({ api, event, args, Users, Currencies })
 
     if (chosenHorse - 1 === winningIndex) {
         const reward = bet * 4;
-        await Currencies.increaseMoney(senderID, reward);
+        let currentData = await usersData.get(senderID);
+        await usersData.set(senderID, { money: (currentData.money || 0) + reward });
         msg += `🎉 চমৎকার! আপনার ঘোড়া প্রথম হয়েছে! আপনি জিতলেন $${reward} কয়েন! 🚀\n`;
     } else {
         msg += `❌ আফসোস! আপনার ঘোড়া রেসে পিছিয়ে পড়েছে। আপনি $${bet} কয়েন হারিয়েছেন।\n`;
