@@ -2,10 +2,10 @@ module.exports.config = {
     name: "crash",
     version: "1.0.0",
     hasPermssion: 0,
-    credits: "Protik Shah",
+    credits: "Pratik Shah",
     description: "রকেট ক্র্যাশ করার আগে মাল্টিপ্লায়ারে ক্যাশআউট করুন",
     commandCategory: "games",
-    usages: "!crash <টার্গেট মাল্টিপ্লায়ার যেমন: 1.5/2.0/5.0> <বাজি>",
+    category: "games",
     cooldowns: 10
 };
 
@@ -22,7 +22,6 @@ module.exports.run = async function({ api, event, args, Currencies }) {
 
     await Currencies.decreaseMoney(senderID, bet);
 
-    // ক্র্যাশ মাল্টিপ্লায়ার জেনারেটর
     const crashPoint = parseFloat((Math.random() * (5.0 - 1.0) + 1.0).toFixed(2));
 
     let msg = `==========================\n`;
