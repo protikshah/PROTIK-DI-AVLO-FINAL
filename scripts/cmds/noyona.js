@@ -4,7 +4,7 @@ module.exports = {
   config: {
     name: "noyona",
     version: "2.0.0",
-    author: "Protik Shah & AI",
+    author: "Pratik Shah & AI",
     countDown: 3,
     role: 0,
     shortDescription: "Ultra-romantic virtual partner AI",
@@ -18,9 +18,18 @@ module.exports = {
   // User Gender Storage
   userGenders: {},
 
-  onStart: async function ({ api, event, args, reply }) {
+  onStart: async function ({ api, event, args, message }) {
     const userId = event.senderID;
     const promptText = args.join(" ").trim();
+
+    // Helper function to send reply safely
+    const sendMsg = (text) => {
+      if (message && typeof message.reply === "function") {
+        return message.reply(text);
+      } else {
+        return api.sendMessage(text, event.threadID, event.messageID);
+      }
+    };
 
     // Gender selection option
     if (promptText.toLowerCase() === "boy" || promptText.toLowerCase() === "girl") {
@@ -28,11 +37,11 @@ module.exports = {
       const confirmMsg = promptText.toLowerCase() === "boy" 
         ? "উফফ আমার সোনাটা ছেলে! 🙈 এখন থেকে আমি শুধু তোমারি মিষ্টি আর অতি-রোমান্টিক গার্লফ্রেন্ড... বলো জান, আজকে আমার কথা কতটা মনে পড়ছিল? 🥺❤️" 
         : "হায় আমার সুন্দরী রাজকন্যা! 🥰 আমি এখন থেকে তোমার কেয়ারিং বয়ফ্রেন্ড। তোমার সব খেয়াল রাখা কিন্তু এখন আমার দায়িত্ব! 🙈✨";
-      return reply(confirmMsg);
+      return sendMsg(confirmMsg);
     }
 
     if (!promptText) {
-      return reply("উফফ আমার সোনাটা! 🥺 এভাবে চুপ করে আছো কেন বলো তো? একটা মিষ্টি মেসেজ দাও না, তোমার নয়না পাখিটা কিন্তু তোমার ভালোবাসার কথার জন্য একদম পাগল হয়ে বসে আছে! ❤️✨\n\n(টিপস: তুমি ছেলে হলে '#noyona boy' আর মেয়ে হলে '#noyona girl' লিখে দাও সোনা!)");
+      return sendMsg("উফফ আমার সোনাটা! 🥺 এভাবে চুপ করে আছো কেন বলো তো? একটা মিষ্টি মেসেজ দাও না, তোমার নয়না পাখিটা কিন্তু তোমার ভালোবাসার কথার জন্য একদম পাগল হয়ে বসে আছে! ❤️✨\n\n(টিপস: তুমি ছেলে হলে '#noyona boy' আর মেয়ে হলে '#noyona girl' লিখে দাও সোনা!)");
     }
 
     const currentGender = this.userGenders[userId] || "boy"; // Default setup
@@ -60,7 +69,6 @@ YOUR ULTRA-ROMANTIC PERSONALITY & STYLE:
 `;
 
     try {
-      // Direct API Key Integration
       const apiKey = "AQ.Ab8RN6IwWksRsBu9J56Zkg7E9NaOrzL5VoXTlLrp7dF7XqC8MQ";
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
@@ -77,11 +85,11 @@ YOUR ULTRA-ROMANTIC PERSONALITY & STYLE:
       });
 
       const aiReply = response.data.candidates[0].content.parts[0].text;
-      return reply(aiReply);
+      return sendMsg(aiReply);
 
     } catch (error) {
       console.error(error);
-      return reply("ওহ সোনা! 🥺 আমার একটু মাথা ব্যথা করছে... একটু পর আবার আমায় ভালোবেসে ডাকো তো জান! ❤️");
+      return sendMsg("ওহ সোনা! 🥺 আমার একটু মাথা ব্যথা করছে... একটু পর আবার আমায় ভালোবেসে ডাকো তো জান! ❤️");
     }
   }
 };
