@@ -2,10 +2,10 @@ module.exports.config = {
     name: "chest",
     version: "1.0.0",
     hasPermssion: 0,
-    credits: "Protik Shah",
+    credits: "Pratik Shah",
     description: "ভাগ্যপরীক্ষা করে রহস্যময় বাক্স আনলক করুন",
     commandCategory: "games",
-    usages: "!chest <১/২/৩ বাক্স নম্বর> <বাজি>",
+    category: "games",
     cooldowns: 10
 };
 
