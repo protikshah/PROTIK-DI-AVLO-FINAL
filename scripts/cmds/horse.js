@@ -2,10 +2,10 @@ module.exports.config = {
     name: "horse",
     version: "1.0.0",
     hasPermssion: 0,
-    credits: "Protik Shah",
+    credits: "Pratik Shah",
     description: "রেস ট্র্যাকে ঘোড়ায় বাজি ধরুন",
     commandCategory: "games",
-    usages: "!horse <ঘোড়া নম্বর ১-৪> <বাজি>",
+    category: "games",
     cooldowns: 15
 };
 
