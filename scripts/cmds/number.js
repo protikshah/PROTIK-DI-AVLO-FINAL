@@ -2,7 +2,7 @@ module.exports.config = {
     name: "number",
     version: "1.0.0",
     role: 0,
-    credits: "Protik Shah",
+    credits: "Pratik Shah",
     description: "১ থেকে ১০ এর মধ্যে সংখ্যা ধরে বাজি ধরুন",
     category: "games",
     guide: {
@@ -11,7 +11,7 @@ module.exports.config = {
     countDown: 5
 };
 
-module.exports.onStart = async function({ api, event, args, Users, Currencies }) {
+module.exports.onStart = async function({ api, event, args, usersData }) {
     const { threadID, messageID, senderID } = event;
     const guess = parseInt(args[0]);
     const bet = parseInt(args[1]);
@@ -19,11 +19,13 @@ module.exports.onStart = async function({ api, event, args, Users, Currencies })
     if (isNaN(guess) || guess < 1 || guess > 10) return api.sendMessage("❌ [SYSTEM]: ১ থেকে ১০ এর মধ্যে একটি সংখ্যা দিন।\nউদাহরণ: #number 7 100", threadID, messageID);
     if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ লিখুন।", threadID, messageID);
 
-    let userMoney = (await Currencies.getData(senderID)).money || 0;
+    let userData = await usersData.get(senderID);
+    let userMoney = userData.money || 0;
+
     if (bet > userMoney) return api.sendMessage(`❌ [SYSTEM]: আপনার কাছে পর্যাপ্ত কয়েন নেই! বর্তমান ব্যালেন্স: $${userMoney}`, threadID, messageID);
 
     const targetNumber = Math.floor(Math.random() * 10) + 1;
-    await Currencies.decreaseMoney(senderID, bet);
+    await usersData.set(senderID, { money: userMoney - bet });
 
     let msg = `==========================\n`;
     msg += `   🎯 LUCKY NUMBER ARENA 🎯\n`;
@@ -37,7 +39,8 @@ module.exports.onStart = async function({ api, event, args, Users, Currencies })
 
     if (guess === targetNumber) {
         const winAmount = bet * 3;
-        await Currencies.increaseMoney(senderID, winAmount);
+        let updatedData = await usersData.get(senderID);
+        await usersData.set(senderID, { money: (updatedData.money || 0) + winAmount });
         msg += `🎉 ফলাফল: নিখুঁত অনুমান! আপনি জিতেছেন $${winAmount} কয়েন! 🚀\n`;
     } else {
         msg += `💀 ফলাফল: ভুল অনুমান! আপনি $${bet} কয়েন হারিয়েছেন। ❌\n`;
