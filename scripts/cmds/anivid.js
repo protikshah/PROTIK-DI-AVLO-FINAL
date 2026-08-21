@@ -2,32 +2,27 @@ const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
 
-const baseApiUrl = async () => {
-    const base = await axios.get("https://raw.githubusercontent.com/mahmudx7/HINATA/main/baseApiUrl.json");
-    return base.data.mahmud;
-};
-
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ansr", "av"],
-        version: "2.0",
-        author: "Pratik Shah",
+        aliases: ["ar", "av"],
+        version: "3.0",
+        author: "Protik Shah",
         countDown: 5,
         role: 0,
         description: {
-            bn: "যেকোনো অ্যানিমে সার্চ করে ভিডিও ক্লিপ দেখুন"
+            en: "Search and watch anime video edits easily"
         },
         category: "anime",
         guide: {
-            bn: "{pn} <অ্যানিমের নাম বা ক্যারেক্টার>"
+            en: "{pn} <anime name or character>"
         }
     },
 
     onStart: async function ({ api, event, args, message }) {
         const kw = args.join(" ");
         if (!kw) {
-            return message.reply("❌ যেকোনো অ্যানিমে বা ক্যারেক্টারের নাম লেখো! (যেমন: #anivid jin woo)");
+            return message.reply("❌ Please provide an anime or character name! (Example: #anivid jin woo)");
         }
 
         const cacheDir = path.join(__dirname, "cache");
@@ -37,27 +32,46 @@ module.exports = {
         try {
             api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-            const base = await baseApiUrl();
-            const apiUrl = `${base}/api/anisr?search=${encodeURIComponent(kw)}`;
+            let videoUrl = null;
 
-            const response = await axios({
+            // Try API 1
+            try {
+                const res1 = await axios.get(`https://samirxpikachu.onrender.com/anime/edit?query=${encodeURIComponent(kw)}`);
+                if (res1.data && res1.data.url) {
+                    videoUrl = res1.data.url;
+                }
+            } catch (e) {
+                console.log("API 1 failed, trying API 2...");
+            }
+
+            // Try API 2 if API 1 fails
+            if (!videoUrl) {
+                const res2 = await axios.get(`https://deku-rest-api.gleeze.com/tiktok/searchvideo?keywords=${encodeURIComponent(kw + " anime edit")}`);
+                if (res2.data && res2.data.result && res2.data.result.length > 0) {
+                    const randomVid = res2.data.result[Math.floor(Math.random() * res2.data.result.length)];
+                    videoUrl = randomVid.play || randomVid.wmplay;
+                }
+            }
+
+            if (!videoUrl) {
+                throw new Error("No video link found from APIs.");
+            }
+
+            // Download video stream
+            const videoStream = await axios({
                 method: "get",
-                url: apiUrl,
+                url: videoUrl,
                 responseType: "stream",
                 timeout: 60000
             });
 
             const writer = fs.createWriteStream(videoPath);
-            response.data.pipe(writer);
+            videoStream.data.pipe(writer);
 
             await new Promise((resolve, reject) => {
                 writer.on("finish", resolve);
                 writer.on("error", reject);
             });
-
-            if (fs.statSync(videoPath).size < 100) {
-                throw new Error("ফাইল খালি বা ইনভ্যালিড।");
-            }
 
             api.setMessageReaction("✅", event.messageID, () => {}, true);
 
@@ -72,7 +86,7 @@ module.exports = {
             console.error("Anivid Error:", err);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply("× ভিডিও ডাউনলোড করতে সমস্যা হয়েছে, একটু পর আবার চেষ্টা করো!");
+            return message.reply("× Error fetching video! Please try searching with a different character or keyword.");
         }
     }
 };
