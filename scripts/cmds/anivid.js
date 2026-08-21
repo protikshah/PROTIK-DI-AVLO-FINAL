@@ -6,16 +6,16 @@ module.exports = {
     config: {
         name: "anivid",
         aliases: ["ar", "anisr", "animevid"],
-        version: "22.0",
+        version: "23.0",
         author: "Pratik Shah",
         countDown: 3,
         role: 0,
         description: {
-            en: "Get short anime video edits"
+            en: "Get working short anime edits via Pinterest engine"
         },
         category: "anime",
         guide: {
-            en: "{pn} <character name>"
+            en: "{pn} <anime character name>"
         }
     },
 
@@ -28,30 +28,42 @@ module.exports = {
         const videoPath = path.join(cacheDir, `anivid_${event.senderID}_${Date.now()}.mp4`);
 
         try {
-            // ১. TikTok Search API endpoint
-            const searchUrl = `https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(query + " anime edit")}&count=12&cursor=0`;
+            // ১. Pinterest Video Scraper (Fast & Reliable)
+            const searchUrl = `https://api.vyturex.com/pinterest?query=${encodeURIComponent(query + " anime edit video")}`;
             const searchRes = await axios.get(searchUrl, { timeout: 10000 });
 
-            const videos = searchRes.data?.data?.videos;
+            let videoUrl = "";
 
-            if (!videos || videos.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply(`❌ "${query}" এর কোনো অ্যানিমে এডিট পাওয়া যায়নি!`);
+            if (searchRes.data && Array.isArray(searchRes.data)) {
+                // ভিডিও লিঙ্কগুলো আলাদা ফিল্টার করা
+                const videoList = searchRes.data.filter(item => typeof item === "string" && item.endsWith(".mp4"));
+                if (videoList.length > 0) {
+                    videoUrl = videoList[Math.floor(Math.random() * videoList.length)];
+                }
             }
 
-            // ২. র্যান্ডমলি একটি ওয়ার্কিং ভিডিও বেছে নেওয়া
-            const randomVid = videos[Math.floor(Math.random() * videos.length)];
-            const downloadUrl = `https://www.tikwm.com${randomVid.play}`;
+            // ব্যাকআপ সিস্টেম: যদি পিন্টারেস্টে না পাওয়া যায়
+            if (!videoUrl) {
+                const altRes = await axios.get(`https://raw.githubusercontent.com/Shinobu-Discord-Bot/Anime-Videos/main/anime_edits.json`, { timeout: 8000 });
+                if (altRes.data && Array.isArray(altRes.data)) {
+                    videoUrl = altRes.data[Math.floor(Math.random() * altRes.data.length)];
+                }
+            }
 
-            // ৩. ভিডিও ডাউনলোড স্ট্রিম
+            if (!videoUrl) {
+                api.setMessageReaction("❌", event.messageID, () => {}, true);
+                return message.reply(`❌ "${query}" এর কোনো ভিডিও পাওয়া যায়নি!`);
+            }
+
+            // ২. ডাইরেক্ট MP4 স্ট্রিম ডাউনলোড
             const response = await axios({
                 method: "get",
-                url: downloadUrl,
+                url: videoUrl,
                 responseType: "stream",
                 headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
                 },
-                timeout: 20000
+                timeout: 30000
             });
 
             const writer = fs.createWriteStream(videoPath);
@@ -64,9 +76,9 @@ module.exports = {
 
             api.setMessageReaction("✅", event.messageID, () => {}, true);
 
-            // ৪. পাঠানো এবং ক্লিনআপ
+            // ৩. মেসেঞ্জারে পাঠানো
             return message.reply({
-                body: `🔥 **Anime Edit:** ${randomVid.title || query.toUpperCase()}\n⏱️ Duration: ${randomVid.duration}s`,
+                body: `🔥 **Anime Edit:** ${query.toUpperCase()} ✨`,
                 attachment: fs.createReadStream(videoPath)
             }, () => {
                 if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
@@ -76,7 +88,7 @@ module.exports = {
             console.error("Anivid Final Error:", err.message);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply("❌ সার্ভার রেসপন্স করছে না। আরেকবার ট্রাই কর মামা!");
+            return message.reply("❌ ভিডিও ডাউনলোড করতে সমস্যা হয়েছে। আবার ট্রাই কর মামা!");
         }
     }
 };
