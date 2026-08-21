@@ -1,17 +1,23 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
+const https = require("https");
+
+// Ignore SSL Certificate Errors (Fixes 526 Cloudflare issue)
+const agent = new https.Agent({
+    rejectUnauthorized: false
+});
 
 module.exports = {
     config: {
         name: "anivid",
         aliases: ["ar", "anisr", "animevid"],
-        version: "8.0",
-        author: "Protik Shah",
+        version: "9.0",
+        author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Search and receive anime video edits seamlessly without 403 blocks"
+            en: "Search and receive anime video edits seamlessly"
         },
         category: "anime",
         guide: {
@@ -32,47 +38,55 @@ module.exports = {
         try {
             api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-            // Using Invidious / Piped API Instance to Bypass 403 Cloudflare Blocks
-            const searchUrl = `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query + " anime edit shorts")}&filter=all`;
-            
-            const searchRes = await axios.get(searchUrl, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
-                timeout: 15000
-            });
+            let videoUrl = null;
 
-            const items = searchRes.data?.items?.filter(item => item.type === "stream");
+            // Source 1: TikTok Search API via TikWM
+            try {
+                const searchRes = await axios.post("https://tikwm.com/api/feed/search", 
+                    new URLSearchParams({
+                        keywords: `${query} anime edit`,
+                        count: '12',
+                        cursor: '0',
+                        web: '1'
+                    }), {
+                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                        httpsAgent: agent,
+                        timeout: 12000
+                    }
+                );
 
-            if (!items || items.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply(`× No anime edit videos found for "${query}"!`);
+                const videos = searchRes.data?.data?.videos;
+                if (videos && videos.length > 0) {
+                    const randomVid = videos[Math.floor(Math.random() * videos.length)];
+                    videoUrl = randomVid.play.startsWith("http") ? randomVid.play : `https://tikwm.com${randomVid.play}`;
+                }
+            } catch (e) {
+                console.log("Source 1 Failed, trying Backup...");
             }
 
-            const selectedVideo = items[Math.floor(Math.random() * items.length)];
-            const videoId = selectedVideo.url.split("v=")[1];
-
-            // Direct Video Download URL via Cobalt/Piped Stream API
-            const streamRes = await axios.get(`https://pipedapi.kavin.rocks/streams/${videoId}`, {
-                timeout: 15000
-            });
-
-            const streams = streamRes.data?.videoStreams || [];
-            // Find combined audio+video or highest quality mp4 stream
-            const targetStream = streams.find(s => s.mimeType.includes("mp4") && s.videoOnly === false) || streams[0];
-
-            if (!targetStream || !targetStream.url) {
-                throw new Error("Unable to parse stream url");
+            // Source 2: Alternative Public Endpoint if TikWM fails
+            if (!videoUrl) {
+                const altRes = await axios.get(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(query + " anime edit")}`, {
+                    httpsAgent: agent,
+                    timeout: 12000
+                });
+                if (altRes.data?.video?.noWatermark) {
+                    videoUrl = altRes.data.video.noWatermark;
+                }
             }
 
-            // Downloading stream with Custom Headers to prevent 403
+            if (!videoUrl) {
+                throw new Error("Unable to locate a valid video stream.");
+            }
+
+            // Download Video Stream bypassing SSL strictness
             const videoStream = await axios({
                 method: "get",
-                url: targetStream.url,
+                url: videoUrl,
                 responseType: "stream",
+                httpsAgent: agent,
                 headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    "Referer": "https://piped.video/"
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
                 timeout: 45000
             });
@@ -95,7 +109,7 @@ module.exports = {
             });
 
         } catch (err) {
-            console.error("Anivid Error:", err.message);
+            console.error("Anivid Execution Error:", err.message);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
             return message.reply(`× Error fetching video: ${err.message || "Failed to download"}`);
