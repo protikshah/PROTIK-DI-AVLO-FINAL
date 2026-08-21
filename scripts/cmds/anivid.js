@@ -5,13 +5,13 @@ const path = require("path");
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "ansr", "an"],
-        version: "5.0",
+        aliases: ["ar", "anisr", "animevid"],
+        version: "6.0",
         author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Search and receive anime video edits seamlessly"
+            en: "Search and receive anime video edits directly"
         },
         category: "anime",
         guide: {
@@ -32,55 +32,38 @@ module.exports = {
         try {
             api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-            // Step 1: Search on YouTube Shorts / Anime Edits using standard Piped Search
-            const searchQuery = encodeURIComponent(`${query} anime edit shorts`);
-            const searchRes = await axios.get(`https://pipedapi.kavin.rocks/search?q=${searchQuery}&filter=shorts`, {
-                timeout: 10000
-            });
-
-            if (!searchRes.data || !searchRes.data.items || searchRes.data.items.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply(`× No anime edit videos found for "${query}"!`);
-            }
-
-            // Pick a random video from the search results
-            const items = searchRes.data.items.filter(item => item.type === "stream");
-            if (items.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply(`× Could not retrieve videos for "${query}".`);
-            }
-
-            const selectedVideo = items[Math.floor(Math.random() * items.length)];
-            const videoId = selectedVideo.url.replace("/watch?v=", "");
-
-            // Step 2: Fetch Direct Video Stream
-            const streamRes = await axios.get(`https://pipedapi.kavin.rocks/streams/${videoId}`, {
+            // TikTok direct video proxy query
+            const searchUrl = `https://api.tiklydown.eu.org/api/download?url=https://www.tiktok.com/search?q=${encodeURIComponent(query + " anime edit")}`;
+            
+            // Backup endpoint: Rapid stable video resolver
+            const res = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(query + " anime edit")}&count=12`, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+                },
                 timeout: 15000
             });
 
-            const videoStreams = streamRes.data.videoStreams;
-            // Get best quality mp4 stream that has audio or fallback to combined stream
-            const streamObj = videoStreams.find(s => s.mimeType.includes("mp4") && s.videoOnly === false) || videoStreams[0];
-
-            if (!streamObj || !streamObj.url) {
-                throw new Error("Failed to extract valid stream URL.");
+            if (!res.data || !res.data.data || !res.data.data.videos || res.data.data.videos.length === 0) {
+                api.setMessageReaction("❌", event.messageID, () => {}, true);
+                return message.reply(`× No video found for "${query}".`);
             }
 
-            // Step 3: Stream and download the video file
-            const writer = fs.createWriteStream(videoPath);
+            const videoList = res.data.data.videos;
+            const randomVideo = videoList[Math.floor(Math.random() * videoList.length)];
+            const playUrl = randomVideo.play.startsWith("http") ? randomVideo.play : `https://www.tikwm.com${randomVideo.play}`;
+
+            // Download binary stream directly
             const response = await axios({
                 method: "get",
-                url: streamObj.url,
-                responseType: "stream",
-                timeout: 60000
+                url: playUrl,
+                responseType: "arraybuffer",
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                },
+                timeout: 30000
             });
 
-            response.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on("finish", resolve);
-                writer.on("error", reject);
-            });
+            fs.writeFileSync(videoPath, Buffer.from(response.data));
 
             api.setMessageReaction("✅", event.messageID, () => {}, true);
 
@@ -92,10 +75,10 @@ module.exports = {
             });
 
         } catch (err) {
-            console.error("Anivid Execution Error:", err.message);
+            console.error("Anivid Error:", err.message);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply(`× Error fetching video: ${err.message || "Please try again later."}`);
+            return message.reply("× Error fetching video! Please try searching again in a moment.");
         }
     }
 };
