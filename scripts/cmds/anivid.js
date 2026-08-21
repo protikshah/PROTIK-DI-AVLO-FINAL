@@ -5,13 +5,13 @@ const path = require("path");
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "anisr", "animevid"],
+        aliases: ["ar", "ar4", "animevid0"],
         version: "6.0",
         author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Search and receive anime video edits directly"
+            en: "Search and receive anime video edits seamlessly"
         },
         category: "anime",
         guide: {
@@ -32,38 +32,51 @@ module.exports = {
         try {
             api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-            // TikTok direct video proxy query
-            const searchUrl = `https://api.tiklydown.eu.org/api/download?url=https://www.tiktok.com/search?q=${encodeURIComponent(query + " anime edit")}`;
-            
-            // Backup endpoint: Rapid stable video resolver
-            const res = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(query + " anime edit")}&count=12`, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
-                },
-                timeout: 15000
-            });
+            let videoUrl = null;
 
-            if (!res.data || !res.data.data || !res.data.data.videos || res.data.data.videos.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply(`× No video found for "${query}".`);
+            // Source 1: TikWM Direct Stream
+            try {
+                const searchKeyword = `${query} anime edit`;
+                const tikwmRes = await axios.get(`https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(searchKeyword)}&count=10`, { timeout: 8000 });
+                if (tikwmRes.data?.data?.videos?.length > 0) {
+                    const randomVid = tikwmRes.data.data.videos[Math.floor(Math.random() * tikwmRes.data.data.videos.length)];
+                    videoUrl = randomVid.play.startsWith("http") ? randomVid.play : `https://www.tikwm.com${randomVid.play}`;
+                }
+            } catch (e) {
+                console.log("Source 1 failed, trying Backup Source...");
             }
 
-            const videoList = res.data.data.videos;
-            const randomVideo = videoList[Math.floor(Math.random() * videoList.length)];
-            const playUrl = randomVideo.play.startsWith("http") ? randomVideo.play : `https://www.tikwm.com${randomVideo.play}`;
+            // Source 2: Backup TikTok API (Invision)
+            if (!videoUrl) {
+                try {
+                    const tikRes = await axios.get(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(query)}`, { timeout: 8000 });
+                    if (tikRes.data?.video?.noWatermark) {
+                        videoUrl = tikRes.data.video.noWatermark;
+                    }
+                } catch (e) {
+                    console.log("Source 2 failed...");
+                }
+            }
 
-            // Download binary stream directly
+            if (!videoUrl) {
+                throw new Error("All video sources are currently unavailable.");
+            }
+
+            // Download Video File
             const response = await axios({
                 method: "get",
-                url: playUrl,
-                responseType: "arraybuffer",
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                },
+                url: videoUrl,
+                responseType: "stream",
                 timeout: 30000
             });
 
-            fs.writeFileSync(videoPath, Buffer.from(response.data));
+            const writer = fs.createWriteStream(videoPath);
+            response.data.pipe(writer);
+
+            await new Promise((resolve, reject) => {
+                writer.on("finish", resolve);
+                writer.on("error", reject);
+            });
 
             api.setMessageReaction("✅", event.messageID, () => {}, true);
 
@@ -75,10 +88,10 @@ module.exports = {
             });
 
         } catch (err) {
-            console.error("Anivid Error:", err.message);
+            console.error("Anivid Execution Error:", err.message);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply("× Error fetching video! Please try searching again in a moment.");
+            return message.reply(`× Unable to fetch video. Please try searching again.`);
         }
     }
 };
