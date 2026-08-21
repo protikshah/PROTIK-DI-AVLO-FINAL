@@ -5,13 +5,13 @@ const path = require("path");
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "av"],
-        version: "3.0",
+        aliases: ["ar", "anvd"],
+        version: "4.0",
         author: "Protik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Search and watch anime video edits easily"
+            en: "Search and send anime edit videos directly"
         },
         category: "anime",
         guide: {
@@ -27,46 +27,43 @@ module.exports = {
 
         const cacheDir = path.join(__dirname, "cache");
         fs.ensureDirSync(cacheDir);
-        const videoPath = path.join(cacheDir, `anivid_${Date.now()}.mp4`);
+        const videoPath = path.join(cacheDir, `anivid_${event.senderID}_${Date.now()}.mp4`);
 
         try {
             api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-            let videoUrl = null;
+            // Using TikWM Official Search API
+            const searchKeyword = `${kw} anime edit`;
+            const searchUrl = `https://www.tikwm.com/api/feed/search?keywords=${encodeURIComponent(searchKeyword)}&count=10`;
 
-            // Try API 1
-            try {
-                const res1 = await axios.get(`https://samirxpikachu.onrender.com/anime/edit?query=${encodeURIComponent(kw)}`);
-                if (res1.data && res1.data.url) {
-                    videoUrl = res1.data.url;
+            const res = await axios.get(searchUrl, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
                 }
-            } catch (e) {
-                console.log("API 1 failed, trying API 2...");
+            });
+
+            if (!res.data || !res.data.data || !res.data.data.videos || res.data.data.videos.length === 0) {
+                api.setMessageReaction("❌", event.messageID, () => {}, true);
+                return message.reply(`× No anime edit found for "${kw}"!`);
             }
 
-            // Try API 2 if API 1 fails
-            if (!videoUrl) {
-                const res2 = await axios.get(`https://deku-rest-api.gleeze.com/tiktok/searchvideo?keywords=${encodeURIComponent(kw + " anime edit")}`);
-                if (res2.data && res2.data.result && res2.data.result.length > 0) {
-                    const randomVid = res2.data.result[Math.floor(Math.random() * res2.data.result.length)];
-                    videoUrl = randomVid.play || randomVid.wmplay;
-                }
-            }
+            const videos = res.data.data.videos;
+            // Picking a random video from top search results
+            const randomVid = videos[Math.floor(Math.random() * videos.length)];
+            
+            // TikWM provides direct video stream without watermark
+            const playUrl = `https://www.tikwm.com${randomVid.play}` || randomVid.play;
 
-            if (!videoUrl) {
-                throw new Error("No video link found from APIs.");
-            }
-
-            // Download video stream
-            const videoStream = await axios({
+            // Stream & save file locally
+            const response = await axios({
                 method: "get",
-                url: videoUrl,
+                url: playUrl,
                 responseType: "stream",
                 timeout: 60000
             });
 
             const writer = fs.createWriteStream(videoPath);
-            videoStream.data.pipe(writer);
+            response.data.pipe(writer);
 
             await new Promise((resolve, reject) => {
                 writer.on("finish", resolve);
@@ -86,7 +83,7 @@ module.exports = {
             console.error("Anivid Error:", err);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply("× Error fetching video! Please try searching with a different character or keyword.");
+            return message.reply("× Error fetching video! Please try searching again.");
         }
     }
 };
