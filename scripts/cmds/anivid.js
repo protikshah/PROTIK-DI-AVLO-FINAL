@@ -1,78 +1,78 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
+const yts = require("yt-search");
+const ytdl = require("@distube/ytdl-core");
 
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "anisr", "animevid"],
-        version: "15.0",
+        aliases: ["ar", "anr", "ad"],
+        version: "16.0",
         author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Download and send anime edits as video attachments"
+            en: "Get short, specific Anime Edit videos"
         },
         category: "anime",
         guide: {
-            en: "{pn} <anime name>"
+            en: "{pn} <anime character name>"
         }
     },
 
     onStart: async function ({ api, event, args, message }) {
         const query = args.join(" ");
-        if (!query) return message.reply("❌ Give me an anime name!");
+        if (!query) return message.reply("❌ Give me an anime character name! (e.g. #ar gojo)");
 
         api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
         try {
-            // ১. বিং থেকে লিংক খোঁজা
-            const searchUrl = `https://www.bing.com/videos/search?q=${encodeURIComponent(query + " anime edit tiktok")}`;
-            const response = await axios.get(searchUrl, {
-                headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-            });
-            const regex = /murl&quot;:&quot;(https:\/\/www\.tiktok\.com\/.*?\/video\/\d+)/g;
-            const match = response.data.match(regex);
-            if (!match) throw new Error("No video found");
-            const tiktokUrl = match[0].split('quot;')[2];
+            // ১. কুয়েরি আপডেট: 'Anime Edit' যোগ করে দিলাম যাতে অন্য ভিডিও না আসে
+            const searchResults = await yts(`${query} anime edit shorts`);
+            
+            // ২. লজিক: শুধুমাত্র ৬০ সেকেন্ডের নিচের ভিডিওগুলো ফিল্টার করা
+            const shortVideos = searchResults.videos.filter(v => v.seconds < 65);
+            
+            if (shortVideos.length === 0) {
+                api.setMessageReaction("❌", event.messageID, () => {}, true);
+                return message.reply(`❌ No short anime edits found for "${query}".`);
+            }
 
-            // ২. TikWM API দিয়ে ভিডিওর সরাসরি MP4 ডাউনলোড লিংক বের করা
-            const tikwm = await axios.get(`https://www.tikwm.com/api/?url=${tiktokUrl}`);
-            const videoUrl = tikwm.data.data.play;
+            // র্যান্ডমলি একটি সেরা শর্ট ভিডিও নেয়া
+            const selectedVid = shortVideos[Math.floor(Math.random() * Math.min(shortVideos.length, 5))];
 
-            // ৩. ভিডিও ফাইল ডাউনলোড করা
+            // ৩. ডাউনলোড স্ট্রিম
             const cacheDir = path.join(__dirname, "cache");
             fs.ensureDirSync(cacheDir);
             const videoPath = path.join(cacheDir, `video_${event.senderID}.mp4`);
             
-            const videoStream = await axios({
-                method: "get",
-                url: videoUrl,
-                responseType: "stream"
+            const stream = ytdl(selectedVid.url, {
+                filter: "videoandaudio",
+                quality: "highest",
             });
 
             const writer = fs.createWriteStream(videoPath);
-            videoStream.data.pipe(writer);
+            stream.pipe(writer);
 
             await new Promise((resolve, reject) => {
                 writer.on("finish", resolve);
                 writer.on("error", reject);
             });
 
-            // ৪. ভিডিও ফাইল পাঠানো
+            // ৪. পাঠানো
             api.setMessageReaction("✅", event.messageID, () => {}, true);
             await message.reply({
-                body: `🔥 **Here is your edit for ${query.toUpperCase()}!**`,
+                body: `🔥 **Anime Edit: ${selectedVid.title}**\n⏱️ Duration: ${selectedVid.timestamp}`,
                 attachment: fs.createReadStream(videoPath)
             });
 
-            // ক্লিনআপ
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
 
         } catch (err) {
             console.error(err);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
-            return message.reply("❌ Could not download video. Try another name.");
+            return message.reply("❌ Error processing video. Please try again!");
         }
     }
 };
