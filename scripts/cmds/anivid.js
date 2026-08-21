@@ -1,23 +1,18 @@
-const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const https = require("https");
-
-// Ignore SSL Certificate Errors (Fixes 526 Cloudflare issue)
-const agent = new https.Agent({
-    rejectUnauthorized: false
-});
+const yts = require("yt-search");
+const ytdl = require("@distube/ytdl-core");
 
 module.exports = {
     config: {
         name: "anivid",
         aliases: ["ar", "anisr", "animevid"],
-        version: "9.0",
+        version: "11.0",
         author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Search and receive anime video edits seamlessly"
+            en: "Search and download anime video edits directly from YouTube"
         },
         category: "anime",
         guide: {
@@ -38,61 +33,26 @@ module.exports = {
         try {
             api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
-            let videoUrl = null;
+            // ১. ইউটিউবে সার্চ করা
+            const searchResults = await yts(`${query} anime edit shorts`);
+            const videos = searchResults.videos;
 
-            // Source 1: TikTok Search API via TikWM
-            try {
-                const searchRes = await axios.post("https://tikwm.com/api/feed/search", 
-                    new URLSearchParams({
-                        keywords: `${query} anime edit`,
-                        count: '12',
-                        cursor: '0',
-                        web: '1'
-                    }), {
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                        httpsAgent: agent,
-                        timeout: 12000
-                    }
-                );
-
-                const videos = searchRes.data?.data?.videos;
-                if (videos && videos.length > 0) {
-                    const randomVid = videos[Math.floor(Math.random() * videos.length)];
-                    videoUrl = randomVid.play.startsWith("http") ? randomVid.play : `https://tikwm.com${randomVid.play}`;
-                }
-            } catch (e) {
-                console.log("Source 1 Failed, trying Backup...");
+            if (!videos || videos.length === 0) {
+                api.setMessageReaction("❌", event.messageID, () => {}, true);
+                return message.reply(`× No anime videos found for "${query}"!`);
             }
 
-            // Source 2: Alternative Public Endpoint if TikWM fails
-            if (!videoUrl) {
-                const altRes = await axios.get(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(query + " anime edit")}`, {
-                    httpsAgent: agent,
-                    timeout: 12000
-                });
-                if (altRes.data?.video?.noWatermark) {
-                    videoUrl = altRes.data.video.noWatermark;
-                }
-            }
+            // প্রথম ৫টি ফলাফলের মধ্যে থেকে র্যান্ডম একটি বেছে নেওয়া
+            const selectedVid = videos[Math.floor(Math.random() * Math.min(videos.length, 5))];
 
-            if (!videoUrl) {
-                throw new Error("Unable to locate a valid video stream.");
-            }
-
-            // Download Video Stream bypassing SSL strictness
-            const videoStream = await axios({
-                method: "get",
-                url: videoUrl,
-                responseType: "stream",
-                httpsAgent: agent,
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
-                timeout: 45000
+            // ২. distube/ytdl-core দিয়ে ডাইরেক্ট ভিডিও ফাইল ডাউনলোড
+            const stream = ytdl(selectedVid.url, {
+                filter: "videoandaudio",
+                quality: "highestvideo"
             });
 
             const writer = fs.createWriteStream(videoPath);
-            videoStream.data.pipe(writer);
+            stream.pipe(writer);
 
             await new Promise((resolve, reject) => {
                 writer.on("finish", resolve);
@@ -102,17 +62,17 @@ module.exports = {
             api.setMessageReaction("✅", event.messageID, () => {}, true);
 
             return message.reply({
-                body: `🔥 **Here's your Anime Edit:** ${query.toUpperCase()} ✨`,
+                body: `🔥 **Here's your Anime Edit:** ${query.toUpperCase()} ✨\n🎬 Title: ${selectedVid.title}`,
                 attachment: fs.createReadStream(videoPath)
             }, () => {
                 if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
             });
 
         } catch (err) {
-            console.error("Anivid Execution Error:", err.message);
+            console.error("Anivid YTDL Error:", err);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
             if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply(`× Error fetching video: ${err.message || "Failed to download"}`);
+            return message.reply(`× Error downloading video: ${err.message || "Failed to process video"}`);
         }
     }
 };
