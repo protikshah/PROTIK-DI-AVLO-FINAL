@@ -7,7 +7,7 @@ const ytdl = require("@distube/ytdl-core");
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "anr", "ad"],
+        aliases: ["ar", "anr", "a3td"],
         version: "16.0",
         author: "Pratik Shah",
         countDown: 5,
