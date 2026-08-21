@@ -1,18 +1,17 @@
+const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const yts = require("yt-search");
-const ytdl = require("@distube/ytdl-core");
 
 module.exports = {
     config: {
         name: "anivid",
         aliases: ["ar", "anisr", "animevid"],
-        version: "18.0",
-        author: "Protik Shah",
+        version: "19.0",
+        author: "Pratik Shah",
         countDown: 3,
         role: 0,
         description: {
-            en: "Get random short anime edits every time"
+            en: "Get instant anime video edits"
         },
         category: "anime",
         guide: {
@@ -22,40 +21,52 @@ module.exports = {
 
     onStart: async function ({ api, event, args, message }) {
         const query = args.join(" ");
-        if (!query) return message.reply("❌ নাম দে মামা! (যেমন: #ar gojo)");
+        if (!query) return message.reply("❌ কোনো অ্যানিমে বা ক্যারেক্টারের নাম দে মামা!");
 
         api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
+        const cacheDir = path.join(__dirname, "cache");
+        fs.ensureDirSync(cacheDir);
+        const videoPath = path.join(cacheDir, `anivid_${event.senderID}_${Date.now()}.mp4`);
+
         try {
-            // ১. সার্চে শুধু অ্যানিমে শর্টস ও এডিট রেজাল্ট টানা
-            const searchResults = await yts(`${query} anime edit shorts amv`);
+            // ১. অটোমেটেড অ্যানিমে ভিডিও API-তে কল করা
+            const apiUrl = `https://raw.githubusercontent.com/Animetos/anime-video-api/main/video.json`;
             
-            if (!searchResults.videos || searchResults.videos.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply(`❌ "${query}" দিয়ে কোনো অ্যানিমে এডিট পেলাম না!`);
+            // ব্যাকআপ টিকটক/পিন্টারেস্ট দ্রুতগতির এপিআই
+            const searchUrl = `https://api.kenliejugarap.com/tiktoksearch/?search=${encodeURIComponent(query + " anime edit shorts")}`;
+            
+            const res = await axios.get(searchUrl, { timeout: 10000 });
+            
+            let downloadUrl = "";
+
+            if (res.data && res.data.status && res.data.videos && res.data.videos.length > 0) {
+                // ১০-১৫টি শর্ট এডিটের মধ্যে থেকে প্রতিবার র্যান্ডম একটি বেছে নেওয়া
+                const randomVid = res.data.videos[Math.floor(Math.random() * Math.min(res.data.videos.length, 10))];
+                downloadUrl = randomVid.play || randomVid.wmplay;
             }
 
-            // ২. ১৫ থেকে ৯০ সেকেন্ডের মধ্যে সব অ্যানিমে ভিডিও ফিল্টার করা
-            const animeShorts = searchResults.videos.filter(v => v.seconds >= 10 && v.seconds <= 90);
-            
-            // ফিল্টার করা ভিডিও না পেলে নরমাল রেজাল্ট থেকে নেওয়া
-            const finalPool = animeShorts.length > 0 ? animeShorts : searchResults.videos;
+            // ব্যাকআপ না পেলে ডাইরেক্ট অ্যানিমে সোর্স
+            if (!downloadUrl) {
+                const altRes = await axios.get(`https://api.vyturex.com/anime?query=${encodeURIComponent(query)}`);
+                downloadUrl = altRes.data.video;
+            }
 
-            // ৩. র‍্যান্ডমাইজেশন: প্রতিবার নতুন ও আলাদা ভিডিও বেছে নেওয়া
-            const selectedVid = finalPool[Math.floor(Math.random() * Math.min(finalPool.length, 10))];
+            if (!downloadUrl) {
+                api.setMessageReaction("❌", event.messageID, () => {}, true);
+                return message.reply(`❌ "${query}" এর কোনো অ্যানিমে এডিট পাওয়া যায়নি!`);
+            }
 
-            // ৪. ভিডিও ডাউনলোড
-            const cacheDir = path.join(__dirname, "cache");
-            fs.ensureDirSync(cacheDir);
-            const videoPath = path.join(cacheDir, `anivid_${event.senderID}_${Date.now()}.mp4`);
-
-            const stream = ytdl(selectedVid.url, {
-                filter: "videoandaudio",
-                quality: "highestvideo"
+            // ২. অতি দ্রুত মেমোরি ছাড়াই ভিডিও ডাউনলোড
+            const videoStream = await axios({
+                method: "get",
+                url: downloadUrl,
+                responseType: "stream",
+                timeout: 30000
             });
 
             const writer = fs.createWriteStream(videoPath);
-            stream.pipe(writer);
+            videoStream.data.pipe(writer);
 
             await new Promise((resolve, reject) => {
                 writer.on("finish", resolve);
@@ -64,18 +75,19 @@ module.exports = {
 
             api.setMessageReaction("✅", event.messageID, () => {}, true);
 
-            // ৫. রেসপন্স ও অটো-ক্লিনআপ
+            // ৩. মেসেঞ্জারে পাঠানো
             return message.reply({
-                body: `🔥 **Anime Edit:** ${selectedVid.title}\n⏱️ Duration: ${selectedVid.timestamp}`,
+                body: `🔥 **Anime Edit:** ${query.toUpperCase()} ✨`,
                 attachment: fs.createReadStream(videoPath)
             }, () => {
                 if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
             });
 
         } catch (err) {
-            console.error(err);
+            console.error("Anivid API Error:", err.message);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
-            return message.reply("❌ ভিডিও ডাউনলোড করতে সমস্যা হয়েছে, আবার ট্রাই কর!");
+            if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+            return message.reply("❌ ভিডিও স্ট্রিম করতে সমস্যা হয়েছে, আবার কমান্ড দে!");
         }
     }
 };
