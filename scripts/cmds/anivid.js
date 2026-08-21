@@ -1,15 +1,17 @@
 const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
 
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "anr", "nid"],
-        version: "14.0",
+        aliases: ["ar", "anisr", "animevid"],
+        version: "15.0",
         author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            en: "Get anime edits directly via Google Search scraping"
+            en: "Download and send anime edits as video attachments"
         },
         category: "anime",
         guide: {
@@ -24,40 +26,53 @@ module.exports = {
         api.setMessageReaction("⏳", event.messageID, () => {}, true);
 
         try {
-            // Bing Video Search (বেশি স্টেবল এবং দ্রুত)
-            const searchUrl = `https://www.bing.com/videos/search?q=${encodeURIComponent(query + " anime edit tiktok")}&qs=n&form=QBVR`;
-            
-            // একটি র্যান্ডম User-Agent ব্যবহার করা যাতে বট হিসেবে ডিটেক্ট না হয়
+            // ১. বিং থেকে লিংক খোঁজা
+            const searchUrl = `https://www.bing.com/videos/search?q=${encodeURIComponent(query + " anime edit tiktok")}`;
             const response = await axios.get(searchUrl, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-                }
+                headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
             });
+            const regex = /murl&quot;:&quot;(https:\/\/www\.tiktok\.com\/.*?\/video\/\d+)/g;
+            const match = response.data.match(regex);
+            if (!match) throw new Error("No video found");
+            const tiktokUrl = match[0].split('quot;')[2];
 
-            // রেসপন্স থেকে mp4 লিংক বের করার Regex
-            const regex = /murl&quot;:&quot;(.*?)&quot;/g;
-            const matches = [...response.data.matchAll(regex)];
+            // ২. TikWM API দিয়ে ভিডিওর সরাসরি MP4 ডাউনলোড লিংক বের করা
+            const tikwm = await axios.get(`https://www.tikwm.com/api/?url=${tiktokUrl}`);
+            const videoUrl = tikwm.data.data.play;
+
+            // ৩. ভিডিও ফাইল ডাউনলোড করা
+            const cacheDir = path.join(__dirname, "cache");
+            fs.ensureDirSync(cacheDir);
+            const videoPath = path.join(cacheDir, `video_${event.senderID}.mp4`);
             
-            const videoLinks = matches
-                .map(m => m[1])
-                .filter(url => url.includes(".mp4") || url.includes("tiktok") || url.includes("cdn"));
-
-            if (videoLinks.length === 0) {
-                api.setMessageReaction("❌", event.messageID, () => {}, true);
-                return message.reply("❌ No video results found. Try another character name.");
-            }
-
-            const videoUrl = videoLinks[Math.floor(Math.random() * Math.min(videoLinks.length, 5))];
-
-            api.setMessageReaction("✅", event.messageID, () => {}, true);
-            return message.reply({
-                body: `🔥 **Here is your edit for ${query.toUpperCase()}:**\n${videoUrl}`
+            const videoStream = await axios({
+                method: "get",
+                url: videoUrl,
+                responseType: "stream"
             });
+
+            const writer = fs.createWriteStream(videoPath);
+            videoStream.data.pipe(writer);
+
+            await new Promise((resolve, reject) => {
+                writer.on("finish", resolve);
+                writer.on("error", reject);
+            });
+
+            // ৪. ভিডিও ফাইল পাঠানো
+            api.setMessageReaction("✅", event.messageID, () => {}, true);
+            await message.reply({
+                body: `🔥 **Here is your edit for ${query.toUpperCase()}!**`,
+                attachment: fs.createReadStream(videoPath)
+            });
+
+            // ক্লিনআপ
+            if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
 
         } catch (err) {
-            console.error("Scraping Error:", err.message);
+            console.error(err);
             api.setMessageReaction("❌", event.messageID, () => {}, true);
-            return message.reply("❌ Server error! The site might be blocking the request. Try again later.");
+            return message.reply("❌ Could not download video. Try another name.");
         }
     }
 };
