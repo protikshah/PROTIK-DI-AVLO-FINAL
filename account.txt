@@ -1,118 +1,131 @@
-const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
-const https = require("https");
-
-// Ignore SSL Certificate Errors (Fixes 526 Cloudflare issue)
-const agent = new https.Agent({
-    rejectUnauthorized: false
-});
-
-module.exports = {
-    config: {
-        name: "anivid",
-        aliases: ["ar", "anisr", "animevid"],
-        version: "9.0",
-        author: "Pratik Shah",
-        countDown: 5,
-        role: 0,
-        description: {
-            en: "Search and receive anime video edits seamlessly"
-        },
-        category: "anime",
-        guide: {
-            en: "{pn} <anime or character name>"
-        }
+[
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1819966213.899588,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "ps_l",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "1"
     },
-
-    onStart: async function ({ api, event, args, message }) {
-        const query = args.join(" ");
-        if (!query) {
-            return message.reply("❌ Please provide an anime or character name! (Example: #anivid jin woo)");
-        }
-
-        const cacheDir = path.join(__dirname, "cache");
-        fs.ensureDirSync(cacheDir);
-        const videoPath = path.join(cacheDir, `anivid_${event.senderID}_${Date.now()}.mp4`);
-
-        try {
-            api.setMessageReaction("⏳", event.messageID, () => {}, true);
-
-            let videoUrl = null;
-
-            // Source 1: TikTok Search API via TikWM
-            try {
-                const searchRes = await axios.post("https://tikwm.com/api/feed/search", 
-                    new URLSearchParams({
-                        keywords: `${query} anime edit`,
-                        count: '12',
-                        cursor: '0',
-                        web: '1'
-                    }), {
-                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                        httpsAgent: agent,
-                        timeout: 12000
-                    }
-                );
-
-                const videos = searchRes.data?.data?.videos;
-                if (videos && videos.length > 0) {
-                    const randomVid = videos[Math.floor(Math.random() * videos.length)];
-                    videoUrl = randomVid.play.startsWith("http") ? randomVid.play : `https://tikwm.com${randomVid.play}`;
-                }
-            } catch (e) {
-                console.log("Source 1 Failed, trying Backup...");
-            }
-
-            // Source 2: Alternative Public Endpoint if TikWM fails
-            if (!videoUrl) {
-                const altRes = await axios.get(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(query + " anime edit")}`, {
-                    httpsAgent: agent,
-                    timeout: 12000
-                });
-                if (altRes.data?.video?.noWatermark) {
-                    videoUrl = altRes.data.video.noWatermark;
-                }
-            }
-
-            if (!videoUrl) {
-                throw new Error("Unable to locate a valid video stream.");
-            }
-
-            // Download Video Stream bypassing SSL strictness
-            const videoStream = await axios({
-                method: "get",
-                url: videoUrl,
-                responseType: "stream",
-                httpsAgent: agent,
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
-                timeout: 45000
-            });
-
-            const writer = fs.createWriteStream(videoPath);
-            videoStream.data.pipe(writer);
-
-            await new Promise((resolve, reject) => {
-                writer.on("finish", resolve);
-                writer.on("error", reject);
-            });
-
-            api.setMessageReaction("✅", event.messageID, () => {}, true);
-
-            return message.reply({
-                body: `🔥 **Here's your Anime Edit:** ${query.toUpperCase()} ✨`,
-                attachment: fs.createReadStream(videoPath)
-            }, () => {
-                if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            });
-
-        } catch (err) {
-            console.error("Anivid Execution Error:", err.message);
-            api.setMessageReaction("❌", event.messageID, () => {}, true);
-            if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-            return message.reply(`× Error fetching video: ${err.message || "Failed to download"}`);
-        }
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1821309819.072246,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "datr",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "eqN_ajHTK2v4ujN-ombvmsH8"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1795114904.934409,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "fr",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "1fw5jexeTmKVycA3R.AWfU_dTYyM-M7D1GAiYVqBFE1moQ5ziZS5qnQK_UvlXuhhKS0p8.BqiJjd..AAA.0.0.BqiKCZ.AWdqKBKtHGbwDx4EvP9wHe14vA8"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1818872925.114295,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "xs",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "1%3Axom5t93IjGcZuw%3A2%3A1787162672%3A-1%3A-1%3A%3AAcybrzHx7-hHJovOlT5c5pxxudnEzEZTOwpmt3MoEw"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1818872925.109598,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "c_user",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "61593453775956"
+    },
+    {
+        "domain": ".facebook.com",
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "presence",
+        "path": "/",
+        "sameSite": null,
+        "secure": true,
+        "session": true,
+        "storeId": null,
+        "value": "C%7B%22t3%22%3A%5B%7B%22o%22%3A0%2C%22i%22%3A%22g.1743550136820746%22%7D%2C%7B%22o%22%3A0%2C%22i%22%3A%22g.1575267591057063%22%7D%2C%7B%22o%22%3A0%2C%22i%22%3A%22g.1730615034812715%22%7D%5D%2C%22utc3%22%3A1787338914918%2C%22v%22%3A1%7D"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1787943714,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "dpr",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "1.25"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1819966213.899832,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "ps_n",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "1"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1821722675.543031,
+        "hostOnly": false,
+        "httpOnly": true,
+        "name": "sb",
+        "path": "/",
+        "sameSite": "no_restriction",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "USFrakSgaHsOq4qZlmftQhJF"
+    },
+    {
+        "domain": ".facebook.com",
+        "expirationDate": 1787943714,
+        "hostOnly": false,
+        "httpOnly": false,
+        "name": "wd",
+        "path": "/",
+        "sameSite": "lax",
+        "secure": true,
+        "session": false,
+        "storeId": null,
+        "value": "1528x724"
     }
-};
+]
