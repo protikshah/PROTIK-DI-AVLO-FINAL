@@ -5,7 +5,7 @@ const path = require("path");
 module.exports = {
     config: {
         name: "anivid",
-        aliases: ["ar", "anisr", "animevid"],
+        aliases: ["ar", "anr", "ad"],
         version: "12.0",
         author: "Pratik Shah",
         countDown: 5,
