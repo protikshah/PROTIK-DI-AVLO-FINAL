@@ -7,7 +7,7 @@ module.exports = {
         name: "anivid",
         aliases: ["ar", "anisr", "animevid"],
         version: "8.0",
-        author: "Pratik Shah",
+        author: "Protik Shah",
         countDown: 5,
         role: 0,
         description: {
