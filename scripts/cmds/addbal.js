@@ -9,7 +9,7 @@ const BankUser = mongoose.models.DiabloBankUser || mongoose.model("DiabloBankUse
 module.exports = {
   config: {
     name: "addbal",
-    version: "1.0.0",
+    version: "1.1.0",
     author: "DI-ABLO JI-SOO",
     countDown: 2,
     role: 2,
@@ -19,9 +19,9 @@ module.exports = {
   },
 
   adminUIDs: ["61591412309835"], // Replace with your Facebook UID
-  adminName: "ᴅɪ-ᴀ勃-ʟᴏ ᴊɪ-sᴏᴏ",
+  adminName: "ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ",
 
-  onStart: async function ({ api, event, args, message }) {
+  onStart: async function ({ api, event, args, message, usersData }) {
     const senderID = event.senderID;
     const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
 
@@ -50,10 +50,12 @@ module.exports = {
       user.balance += amount;
       await user.save();
 
+      const targetName = await usersData.getName(targetID);
+
       return sendMsg(`✅ ─── [ ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ ] ─── ✅\n\n` +
-        `👤 ᴀᴅᴍɪɴ: ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ\n` +
+        `👤 ᴀᴅᴍɪɴ: ${this.adminName}\n` +
         `💳 ᴄʀᴇᴅɪᴛᴇᴅ: +$${amount.toLocaleString()}\n` +
-        `🎯 ᴛᴀʀɢᴇᴛ ᴜɪᴅ: ${targetID}\n` +
+        `🎯 ᴛᴀʀɢᴇᴛ ᴜsᴇʀ: ${targetName}\n` +
         `💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: $${user.balance.toLocaleString()}`
       );
     } catch (err) {
