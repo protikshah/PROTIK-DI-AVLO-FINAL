@@ -11,7 +11,7 @@ module.exports = {
   config: {
     name: "rps",
     aliases: ["rockpaperscissors"],
-    version: "1.0.0",
+    version: "1.0.1",
     author: "DI-ABLO JI-SOO",
     countDown: 4,
     role: 0,
@@ -53,10 +53,11 @@ module.exports = {
       let user = await BankUser.findOne({ userID: senderID });
       if (!user) user = await BankUser.create({ userID: senderID, balance: 1000 });
 
+      // Object keys fixed with quotes
       const choices = {
-        r: "ROCK", rock: "ROCK", 🪨: "ROCK",
-        p: "PAPER", paper: "PAPER", 📄: "ROCK",
-        s: "SCISSORS", scissors: "SCISSORS", ✂️: "SCISSORS"
+        "r": "ROCK", "rock": "ROCK", "🪨": "ROCK",
+        "p": "PAPER", "paper": "PAPER", "📄": "PAPER",
+        "s": "SCISSORS", "scissors": "SCISSORS", "✂️": "SCISSORS"
       };
 
       const userChoiceStr = args[0]?.toLowerCase();
@@ -100,7 +101,7 @@ module.exports = {
 
       await BankUser.updateOne({ userID: senderID }, { $set: { balance: newBalance } });
 
-      const response = `⚔️ ─── [ ʀ.ᴘ.s ᴄʜᴀʟʟᴇɴɢᴇ ] ─── ⚔️\n\n` +
+      const response = `⚔️ ───[ ʀ.ᴘ.s ᴄʜᴀʟʟᴇɴɢᴇ ]─── ⚔️\n\n` +
         `👤 ʏᴏᴜ: ${icons[userChoice]}\n` +
         `🤖 ʙᴏᴛ: ${icons[botChoice]}\n\n` +
         `${resultMsg}\n` +
