@@ -1,114 +1,115 @@
+const mongoose = require("mongoose");
+
+const bankUserSchema = new mongoose.Schema({
+  userID: { type: String, required: true, unique: true },
+  balance: { type: Number, default: 0 }
+});
+
+const BankUser = mongoose.models.DiabloBankUser || mongoose.model("DiabloBankUser", bankUserSchema);
+
 module.exports = {
   config: {
     name: "rps",
     aliases: ["rockpaperscissors"],
-    version: "7.0",
-    author: "Protik / Assistant",
-    countDown: 3,
+    version: "1.0.0",
+    author: "DI-ABLO JI-SOO",
+    countDown: 4,
     role: 0,
-    shortDescription: { en: "Rock Paper Scissors Duel" },
-    category: "games",
-    guide: { en: "{pn} [rock/paper/scissors] [bet_amount]" }
+    shortDescription: "Play Rock Paper Scissors against Bot",
+    category: "game",
+    guide: { en: "{p}rps [rock/paper/scissors] [amount/2m/all]" }
   },
 
-  onStart: async function ({ message, args, event, usersData }) {
-    const { senderID } = event;
-    const userPick = args[0] ? args[0].toLowerCase() : null;
-    const rawBet = args[1];
+  parseAmount: function (str, userBalance) {
+    if (!str) return null;
+    str = str.toLowerCase().trim();
+    if (str === "all") return userBalance;
 
-    const validPicks = {
-      rock: "✊ Rock",
-      r: "✊ Rock",
-      paper: "🖐️ Paper",
-      p: "🖐️ Paper",
-      scissors: "✌️ Scissors",
-      s: "✌️ Scissors"
-    };
+    const match = str.match(/^(\d+(\.\d+)?)\s*([kmb])?$/);
+    if (!match) return null;
 
-    if (!userPick || !validPicks[userPick] || !rawBet) {
-      return message.reply("> ✂️\n• Usage: !rps [rock/paper/scissors] [bet]\n• Example: !rps rock 2m");
+    let value = parseFloat(match[1]);
+    const unit = match[3];
+
+    if (unit === "k") value *= 1000;
+    else if (unit === "m") value *= 1000000;
+    else if (unit === "b") value *= 1000000000;
+
+    return Math.floor(value);
+  },
+
+  formatMoney: function (num) {
+    if (num >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "ʙ";
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "ᴍ";
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, "") + "ᴋ";
+    return num.toLocaleString();
+  },
+
+  onStart: async function ({ api, event, args, message }) {
+    const senderID = event.senderID;
+    const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
+
+    try {
+      let user = await BankUser.findOne({ userID: senderID });
+      if (!user) user = await BankUser.create({ userID: senderID, balance: 1000 });
+
+      const choices = {
+        r: "ROCK", rock: "ROCK", 🪨: "ROCK",
+        p: "PAPER", paper: "PAPER", 📄: "ROCK",
+        s: "SCISSORS", scissors: "SCISSORS", ✂️: "SCISSORS"
+      };
+
+      const userChoiceStr = args[0]?.toLowerCase();
+      const userChoice = choices[userChoiceStr];
+
+      if (!userChoice) {
+        return sendMsg("❌ ᴘʟᴇᴀsᴇ ᴄʜᴏᴏsᴇ 'ʀᴏᴄᴋ', 'ᴘᴀᴘᴇʀ', ᴏʀ 'sᴄɪssᴏʀs'.\nᴇxᴀᴍᴘʟᴇ: #ʀᴘs ʀᴏᴄᴋ 2ᴍ");
+      }
+
+      const betAmount = this.parseAmount(args[1], user.balance);
+
+      if (betAmount === null || isNaN(betAmount) || betAmount <= 0) {
+        return sendMsg("❌ ɪɴᴠᴀʟɪᴅ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ!");
+      }
+
+      if (user.balance < betAmount) {
+        return sendMsg(`❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ! ʏᴏᴜ ʜᴀᴠᴇ $${user.balance.toLocaleString()}.`);
+      }
+
+      const botOptions = ["ROCK", "PAPER", "SCISSORS"];
+      const botChoice = botOptions[Math.floor(Math.random() * botOptions.length)];
+
+      const icons = { ROCK: "🪨 ʀᴏᴄᴋ", PAPER: "📄 ᴘᴀᴘᴇʀ", SCISSORS: "✂️ sᴄɪssᴏʀs" };
+
+      let newBalance = user.balance;
+      let resultMsg = "";
+
+      if (userChoice === botChoice) {
+        resultMsg = `🤝 ɪᴛ's ᴀ ᴛɪᴇ! ʏᴏᴜʀ ʙᴇᴛ ɪs ʀᴇᴛᴜʀɴᴇᴅ.`;
+      } else if (
+        (userChoice === "ROCK" && botChoice === "SCISSORS") ||
+        (userChoice === "PAPER" && botChoice === "ROCK") ||
+        (userChoice === "SCISSORS" && botChoice === "PAPER")
+      ) {
+        newBalance += betAmount;
+        resultMsg = `🎉 ʙᴀʙʏ, ʏᴏᴜ ᴡᴏɴ $${this.formatMoney(betAmount * 2)}!`;
+      } else {
+        newBalance -= betAmount;
+        resultMsg = `💔 ʙᴀʙʏ, ʏᴏᴜ ʟᴏsᴛ $${this.formatMoney(betAmount)}`;
+      }
+
+      await BankUser.updateOne({ userID: senderID }, { $set: { balance: newBalance } });
+
+      const response = `⚔️ ─── [ ʀ.ᴘ.s ᴄʜᴀʟʟᴇɴɢᴇ ] ─── ⚔️\n\n` +
+        `👤 ʏᴏᴜ: ${icons[userChoice]}\n` +
+        `🤖 ʙᴏᴛ: ${icons[botChoice]}\n\n` +
+        `${resultMsg}\n` +
+        `💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: $${newBalance.toLocaleString()}`;
+
+      return sendMsg(response);
+    } catch (err) {
+      console.error(err);
+      return sendMsg("❌ ʀᴘs ɢᴀᴍᴇ ᴇʀʀᴏʀ!");
     }
-
-    const parseBet = (input) => {
-      if (!input) return NaN;
-      const lower = input.toLowerCase();
-      if (lower.endsWith("k")) return parseFloat(lower) * 1000;
-      if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
-      if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
-      return parseInt(input);
-    };
-
-    const bet = parseBet(rawBet);
-    if (isNaN(bet) || bet <= 0) return message.reply("> ✂️\n• Please enter a valid bet amount!");
-    if (bet > 50000000000) return message.reply("> ✂️\n• Maximum bet limit is $50B!");
-
-    let userData = await usersData.get(senderID);
-    let currentMoney = typeof userData.money === "number" ? userData.money : (userData.data?.money || 0);
-
-    if (currentMoney < bet) return message.reply("> ✂️\n• Insufficient balance in your account!");
-
-    const choices = ["rock", "paper", "scissors"];
-    const botChoiceKey = choices[Math.floor(Math.random() * choices.length)];
-    
-    const userChoiceKey = userPick.startsWith("r") ? "rock" : (userPick.startsWith("p") ? "paper" : "scissors");
-
-    let isWin = false;
-    let isDraw = false;
-
-    if (userChoiceKey === botChoiceKey) {
-      isDraw = true;
-    } else if (
-      (userChoiceKey === "rock" && botChoiceKey === "scissors") ||
-      (userChoiceKey === "paper" && botChoiceKey === "rock") ||
-      (userChoiceKey === "scissors" && botChoiceKey === "paper")
-    ) {
-      isWin = true;
-    }
-
-    let newBalance = currentMoney;
-    let winAmount = 0;
-
-    if (isWin) {
-      winAmount = bet;
-      newBalance = currentMoney + winAmount;
-    } else if (!isDraw) {
-      newBalance = currentMoney - bet;
-    }
-
-    // Stats
-    if (!userData.data) userData.data = {};
-    if (!userData.data.rpsStats) userData.data.rpsStats = { wins: 0, total: 0 };
-    userData.data.rpsStats.total += 1;
-    if (isWin) userData.data.rpsStats.wins += 1;
-
-    const totalGames = userData.data.rpsStats.total;
-    const totalWins = userData.data.rpsStats.wins;
-    const winRate = ((totalWins / totalGames) * 100).toFixed(1);
-
-    // Database Permanent Save
-    userData.money = newBalance;
-    userData.data.money = newBalance;
-    await usersData.set(senderID, userData);
-
-    const formatMoney = (num) => {
-      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
-      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
-      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
-      return num.toLocaleString();
-    };
-
-    let statusMsg = "";
-    if (isWin) statusMsg = `• Master Move! You won +$${formatMoney(winAmount)}`;
-    else if (isDraw) statusMsg = `• Equal Match! Tie - Money refunded`;
-    else statusMsg = `• Defeated! You lost -$${formatMoney(bet)}`;
-
-    const response = 
-      `> ✂️\n` +
-      `${statusMsg}\n` +
-      `• Duel: You [ ${validPicks[userChoiceKey]} ] vs Bot [ ${validPicks[botChoiceKey]} ]\n\n` +
-      `🎯 RPS Win Rate: ${winRate}% (${totalWins}/${totalGames})\n` +
-      `💳 Balance: $${formatMoney(newBalance)}`;
-
-    return message.reply(response);
   }
 };
