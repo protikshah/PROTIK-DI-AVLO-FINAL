@@ -1,56 +1,56 @@
+const mongoose = require("mongoose");
+
+const UserSchema = new mongoose.Schema({
+  userID: { type: String, required: true, unique: true },
+  balance: { type: Number, default: 0 },
+  loan: { type: Number, default: 0 }
+});
+
+const BankUser = mongoose.models.DiabloBankUser || mongoose.model("DiabloBankUser", UserSchema);
+
 module.exports = {
   config: {
     name: "bal",
-    aliases: ["money", "balance", "cd"],
-    version: "7.0",
-    author: "Protik / Assistant",
-    countDown: 3,
+    aliases: ["balance"],
+    version: "1.0.0",
+    author: "DI-ABLO JI-SOO",
+    countDown: 2,
     role: 0,
-    shortDescription: { en: "Check your bank card balance" },
+    shortDescription: "Check DI-ABLO Bank Balance",
     category: "economy",
-    guide: { en: "{pn} [reply/mention/UID/empty]" }
+    guide: { en: "{p}bal [@user / reply]" }
   },
 
-  onStart: async function ({ message, args, event, usersData }) {
-    let targetID = event.senderID;
+  onStart: async function ({ api, event, message }) {
+    const senderID = event.senderID;
+    let targetID = senderID;
 
-    if (Object.keys(event.mentions).length > 0) {
-      targetID = Object.keys(event.mentions)[0];
-    } else if (event.type === "message_reply") {
+    if (event.type === "message_reply") {
       targetID = event.messageReply.senderID;
-    } else if (args[0] && !isNaN(args[0])) {
-      targetID = args[0];
+    } else if (Object.keys(event.mentions || {}).length > 0) {
+      targetID = Object.keys(event.mentions)[0];
     }
 
-    let userData = await usersData.get(targetID);
-    if (!userData) return message.reply("> 💳\n• User record not found in system!");
+    const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
 
-    let currentMoney = typeof userData.money === "number" ? userData.money : (userData.data?.money || 0);
+    try {
+      let user = await BankUser.findOne({ userID: targetID });
+      if (!user) {
+        user = await BankUser.create({ userID: targetID, balance: 1000, loan: 0 });
+      }
 
-    const formatMoney = (num) => {
-      if (num >= 1000000000) return (num / 1000000000).toFixed(2) + "B";
-      if (num >= 1000000) return (num / 1000000).toFixed(2) + "M";
-      if (num >= 1000) return (num / 1000).toFixed(2) + "K";
-      return num.toLocaleString();
-    };
+      const nameLabel = targetID === senderID ? "ʏᴏᴜʀ" : "ᴜsᴇʀ";
+      const responseStr = `🏦 ─── [ ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ ] ─── 🏦\n\n` +
+        `💳 ${nameLabel} ᴀᴄᴄᴏᴜɴᴛ ᴅᴇᴛᴀɪʟs:\n` +
+        `👤 ᴜɪᴅ: ${user.userID}\n` +
+        `💰 ʙᴀʟᴀɴᴄᴇ: $${user.balance.toLocaleString()}\n` +
+        `🏦 ᴀᴄᴛɪᴠᴇ ʟᴏᴀɴ: $${user.loan.toLocaleString()}\n\n` +
+        `───────────────`;
 
-    const name = await usersData.getName(targetID);
-    
-    // Masked Card Number Generator based on UID
-    const cardNum = `${targetID.slice(0, 4)} •••• •••• ${targetID.slice(-4)}`;
-
-    const cardResponse = 
-      `┌─────────────────────┐\n` +
-      `│ 💳  DI-ABLO BANK OF JISOO    │\n` +
-      `│ ░░░░  [ CHIP ]   VIP     │\n` +
-      `│                          │\n` +
-      `│  NUMBER : ${cardNum}   │\n` +
-      `│  HOLDER : ${name.toUpperCase().slice(0, 16)}   │\n` +
-      `│                          │\n` +
-      `│  BALANCE : $${formatMoney(currentMoney)}           │\n` +
-      `└─────────────────────┘\n` +
-      `> 🏛️ Vault Status: Secure & Active`;
-
-    return message.reply(cardResponse);
+      return sendMsg(responseStr);
+    } catch (err) {
+      console.error(err);
+      return sendMsg("❌ ᴇʀʀᴏʀ ғᴇᴛᴄʜɪɴɢ ʙᴀʟᴀɴᴄᴇ.");
+    }
   }
 };
