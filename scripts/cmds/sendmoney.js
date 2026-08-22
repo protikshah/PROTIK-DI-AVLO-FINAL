@@ -10,7 +10,7 @@ module.exports = {
   config: {
     name: "sendmoney",
     aliases: ["pay"],
-    version: "1.0.0",
+    version: "1.1.0",
     author: "DI-ABLO JI-SOO",
     countDown: 2,
     role: 0,
@@ -19,7 +19,7 @@ module.exports = {
     guide: { en: "{p}sendmoney [@user / reply] [amount]" }
   },
 
-  onStart: async function ({ api, event, args, message }) {
+  onStart: async function ({ api, event, args, message, usersData }) {
     const senderID = event.senderID;
     const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
 
@@ -56,9 +56,12 @@ module.exports = {
       await sender.save();
       await target.save();
 
-      return sendMsg(`💸 ─── [ᴛʀᴀɴsᴀᴄᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ] ─── 💸\n\n` +
-        `📤 sᴇɴᴅᴇʀ: ${senderID}\n` +
-        `📥 ʀᴇᴄᴇɪᴠᴇʀ: ${targetID}\n` +
+      const senderName = await usersData.getName(senderID);
+      const targetName = await usersData.getName(targetID);
+
+      return sendMsg(`💸 ─── [ ᴛʀᴀɴsᴀᴄᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ ] ─── 💸\n\n` +
+        `📤 sᴇɴᴅᴇʀ: ${senderName}\n` +
+        `📥 ʀᴇᴄᴇɪᴠᴇʀ: ${targetName}\n` +
         `💵 ᴀᴍᴏᴜɴᴛ: $${amount.toLocaleString()}\n` +
         `💰 ʏᴏᴜʀ ʀᴇᴍᴀɪɴɪɴɢ ʙᴀʟᴀɴᴄᴇ: $${sender.balance.toLocaleString()}`
       );
