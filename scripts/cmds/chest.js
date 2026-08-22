@@ -1,58 +1,102 @@
-module.exports.config = {
-    name: "chest",
-    version: "1.0.0",
-    role: 0,
-    credits: "Pratik Shah",
-    description: "ভাগ্যপরীক্ষা করে রহস্যময় বাক্স আনলক করুন",
-    category: "games",
-    guide: {
-        en: "{pref}chest <১/২/৩ বাক্স নম্বর> <বাজি>"
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema({
+    userID: { type: String, required: true, unique: true },
+    wallet: { type: Number, default: 1000 },
+    bank: { type: Number, default: 0 }
+});
+
+const User = mongoose.models.BankUser || mongoose.model("BankUser", userSchema);
+
+module.exports = {
+    config: {
+        name: "chest",
+        version: "2.0.0",
+        role: 0,
+        author: "Pratik Shah",
+        description: { en: "Unlock mystery chests for massive vault rewards" },
+        category: "games",
+        guide: {
+            en: "{pn} <chest_number 1-3> <bet_amount>"
+        },
+        countDown: 5
     },
-    countDown: 10
-};
 
-module.exports.onStart = async function({ api, event, args, usersData }) {
-    const { threadID, messageID, senderID } = event;
-    const choice = parseInt(args[0]);
-    const bet = parseInt(args[1]);
+    onStart: async function ({ api, event, args, message }) {
+        const { threadID, messageID, senderID } = event;
+        const BANK_NAME = "🏛️ ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ ʀᴏʏᴀʟ ᴠᴀᴜʟᴛ 🏛️";
 
-    if (isNaN(choice) || choice < 1 || choice > 3) return api.sendMessage("❌ [SYSTEM]: ১, ২ অথবা ৩ নম্বর বাক্সের যেকোনো একটি বেছে নিন।\nউদাহরণ: #chest 2 500", threadID, messageID);
-    if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
+        const parseBet = (input) => {
+            if (!input) return NaN;
+            const lower = input.toLowerCase();
+            if (lower.endsWith("k")) return parseFloat(lower) * 1000;
+            if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
+            if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
+            return parseInt(input);
+        };
 
-    let userData = await usersData.get(senderID);
-    let userMoney = userData.money || 0;
+        const choice = parseInt(args[0]);
+        const bet = parseBet(args[1]);
 
-    if (bet > userMoney) return api.sendMessage(`❌ [SYSTEM]: আপনার কাছে পর্যাপ্ত কয়েন নেই!`, threadID, messageID);
+        if (isNaN(choice) || choice < 1 || choice > 3) {
+            return message.reply("╔══ [ ❌ ɪɴᴠᴀʟɪᴅ ᴄʜᴏɪᴄᴇ ] ══╗\n  ᴄʜᴏᴏsᴇ ᴀ ᴄʜᴇsᴛ ɴᴜᴍʙᴇʀ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 3!\n  sʏɴᴛᴀx: #ᴄʜᴇsᴛ <1-3> <ʙᴇᴛ>\n  ᴇxᴀᴍᴘʟᴇ: #ᴄʜᴇsᴛ 2 500\n╚═══════════════════════════╝");
+        }
 
-    await usersData.set(senderID, { money: userMoney - bet });
+        if (isNaN(bet) || bet <= 0) {
+            return message.reply("╔══ [ ❌ ɪɴᴠᴀʟɪᴅ ʙᴇᴛ ] ══╗\n  ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴀ ᴠᴀʟɪᴅ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ!\n╚═══════════════════════╝");
+        }
 
-    const outcomes = ['jackpot', 'coins', 'empty'];
-    outcomes.sort(() => Math.random() - 0.5);
+        let user = await User.findOne({ userID: senderID }) || await User.create({ userID: senderID });
 
-    const userOutcome = outcomes[choice - 1];
+        if (user.wallet < bet) {
+            return message.reply(
+                `╔══ [ ❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ғᴜɴᴅs ] ══╗\n` +
+                `  ʏᴏᴜ ɴᴇᴇᴅ $${bet.toLocaleString()} ɪɴ ʏᴏᴜʀ ᴡᴀʟʟᴇᴛ!\n` +
+                `  💡 ᴡɪᴛʜᴅʀᴀᴡ ғᴜɴᴅs: #ʙᴀɴᴋ ᴡɪᴛʜᴅʀᴀᴡ <ᴀᴍᴏᴜɴᴛ>\n` +
+                `╚════════════════════════════════╝`
+            );
+        }
 
-    let msg = `==========================\n`;
-    msg += `   🧰 MYSTERY CHEST ROOM 🧰\n`;
-    msg += `==========================\n`;
-    msg += `📦 আপনি নির্বাচন করেছেন: [ Box #${choice} ]\n`;
-    msg += `🗝️ বাক্স খোলা হচ্ছে... [ 🔓 ]\n`;
-    msg += `--------------------------\n`;
+        // Deduct initial bet
+        user.wallet -= bet;
 
-    let currentData = await usersData.get(senderID);
-    let currentMoney = currentData.money || 0;
+        const outcomes = ['jackpot', 'coins', 'empty'];
+        outcomes.sort(() => Math.random() - 0.5);
 
-    if (userOutcome === 'jackpot') {
-        const reward = bet * 5;
-        await usersData.set(senderID, { money: currentMoney + reward });
-        msg += `💎 জ্যাকপট!! আপনি স্বর্ণভর্তি সিন্দুক পেয়েছেন! \n🎁 রিওয়ার্ড: $${reward} কয়েন (5x)! 🔥\n`;
-    } else if (userOutcome === 'coins') {
-        const reward = Math.floor(bet * 1.5);
-        await usersData.set(senderID, { money: currentMoney + reward });
-        msg += `🪙 আপনি মাঝারি মানের ধনসম্পদ পেয়েছেন।\n🎁 রিওয়ার্ড: $${reward} কয়েন (1.5x)!\n`;
-    } else {
-        msg += `💀 আফসোস! বাক্সের ভেতরে শুধুই বিষাক্ত সাপ ও কঙ্কাল ছিল!\n❌ আপনি $${bet} কয়েন হারিয়েছেন।\n`;
+        const userOutcome = outcomes[choice - 1];
+
+        let resultMsg = "";
+        let netProfit = 0;
+
+        if (userOutcome === 'jackpot') {
+            const reward = bet * 5;
+            user.wallet += reward;
+            netProfit = reward - bet;
+            resultMsg = `💎 ᴊᴀᴄᴋᴘᴏᴛ!! ɢᴏʟᴅ-ғɪʟʟᴇᴅ ᴛʀᴇᴀsᴜʀᴇ ᴄʜᴇsᴛ!\n  🎁 ᴘʀᴏғɪᴛ: +$${reward.toLocaleString()} (5x Multiplier)`;
+        } else if (userOutcome === 'coins') {
+            const reward = Math.floor(bet * 1.5);
+            user.wallet += reward;
+            netProfit = reward - bet;
+            resultMsg = `🪙 ᴍᴏᴅᴇʀᴀᴛᴇ ᴛʀᴇᴀsᴜʀᴇ ғᴏᴜɴᴅ!\n  🎁 ᴘʀᴏғɪᴛ: +$${reward.toLocaleString()} (1.5x Multiplier)`;
+        } else {
+            resultMsg = `💀 ᴛʀᴀᴘ! ᴏɴʟʏ ᴘᴏɪsᴏɴᴏᴜs sɴᴀᴋᴇs & sᴋᴇʟᴇᴛᴏɴs!\n  ❌ ʟᴏss: -$${bet.toLocaleString()}`;
+        }
+
+        await user.save();
+
+        const response = 
+            `╔════════════════════════════════╗\n` +
+            `     🧰 ᴍʏsᴛᴇʀʏ ᴄʜᴇsᴛ ʀᴏᴏᴍ 🧰\n` +
+            `╠════════════════════════════════╣\n` +
+            `  📦 ᴄʜᴇsᴛ sᴇʟᴇᴄᴛᴇᴅ: [ ᴄʜᴇsᴛ #${choice} ]\n` +
+            `  🗝️ ᴜɴʟᴏᴄᴋɪɴɢ Vault... [ 🔓 ]\n` +
+            `  ───────────────────────────────\n` +
+            `  ${resultMsg}\n` +
+            `  ───────────────────────────────\n` +
+            `  💳 ᴡᴀʟʟᴇᴛ ʙᴀʟᴀɴᴄᴇ : $${user.wallet.toLocaleString()}\n` +
+            `  🏦 ɪɴsᴛɪᴛᴜᴛɪᴏɴ     : ${BANK_NAME}\n` +
+            `╚════════════════════════════════╝`;
+
+        return message.reply(response);
     }
-    msg += `==========================`;
-
-    return api.sendMessage(msg, threadID, messageID);
 };
