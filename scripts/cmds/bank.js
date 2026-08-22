@@ -10,7 +10,7 @@ module.exports = {
   config: {
     name: "bank",
     aliases: ["cutbal", "loan", "payloan"],
-    version: "1.0.0",
+    version: "1.1.0",
     author: "DI-ABLO JI-SOO",
     countDown: 2,
     role: 0,
@@ -20,8 +20,9 @@ module.exports = {
   },
 
   adminUIDs: ["61591412309835"], // Replace with your Facebook UID
+  adminName: "ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ",
 
-  onStart: async function ({ api, event, args, message }) {
+  onStart: async function ({ api, event, args, message, usersData }) {
     const senderID = event.senderID;
     const subCommand = args[0]?.toLowerCase();
     const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
@@ -30,10 +31,10 @@ module.exports = {
     if (!user) user = await BankUser.create({ userID: senderID, balance: 1000, loan: 0 });
 
     try {
-      // SUB-COMMAND: CUTBAL (Admin Only)
+      // SUB-COMMAND: CUTBAL
       if (subCommand === "cutbal") {
         if (!this.adminUIDs.includes(senderID)) {
-          return sendMsg("❌ ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ. ᴏɴʟʏ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀ ᴅɪ-ᴀʙʟᴏ ᴄᴀɴ ᴄᴜᴛ ʙᴀʟᴀɴᴄᴇ.");
+          return sendMsg("❌ ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ. ᴏɴʟʏ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀ ᴄᴀɴ ᴄᴜᴛ ʙᴀʟᴀɴᴄᴇ.");
         }
 
         let targetID = senderID;
@@ -54,10 +55,12 @@ module.exports = {
         targetUser.balance = Math.max(0, targetUser.balance - amount);
         await targetUser.save();
 
-        return sendMsg(`⚠️ ─── [ ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ ] ─── ⚠️\n\n` +
-          `👤 ᴀᴅᴍɪɴ: ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ\n` +
+        const targetName = await usersData.getName(targetID);
+
+        return sendMsg(`⚠️ ─── [ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ] ─── ⚠️\n\n` +
+          `👤 ᴀᴅᴍɪɴ: ${this.adminName}\n` +
           `🔻 ᴅᴇʙɪᴛᴇᴅ: -$${amount.toLocaleString()}\n` +
-          `🎯 ᴛᴀʀɢᴇᴛ ᴜɪᴅ: ${targetID}\n` +
+          `🎯 ᴛᴀʀɢᴇᴛ ᴜsᴇʀ: ${targetName}\n` +
           `💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: $${targetUser.balance.toLocaleString()}`
         );
       }
@@ -77,7 +80,7 @@ module.exports = {
           return sendMsg("❌ ᴍᴀxɪᴍᴜᴍ ʟᴏᴀɴ ʟɪᴍɪᴛ ɪs $1,000,000.");
         }
 
-        user.loan = Math.floor(amount * 1.1); // 10% interest
+        user.loan = Math.floor(amount * 1.1);
         user.balance += amount;
         await user.save();
 
