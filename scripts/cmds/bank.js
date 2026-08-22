@@ -10,17 +10,41 @@ module.exports = {
   config: {
     name: "bank",
     aliases: ["cutbal", "loan", "payloan"],
-    version: "1.1.0",
+    version: "1.2.0",
     author: "DI-ABLO JI-SOO",
     countDown: 2,
     role: 0,
     shortDescription: "DI-ABLO Bank Services (Loan, PayLoan, CutBal)",
     category: "economy",
-    guide: { en: "{p}bank cutbal [@user] [amount]\n{p}bank loan [amount]\n{p}bank payloan" }
+    guide: { en: "{p}bank cutbal [@user] [amount]\n{p}bank loan [amount / 2b]\n{p}bank payloan" }
   },
 
   adminUIDs: ["61591412309835"], // Replace with your Facebook UID
   adminName: "ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ",
+
+  parseAmount: function (str) {
+    if (!str) return null;
+    str = str.toLowerCase().trim();
+
+    const match = str.match(/^(\d+(\.\d+)?)\s*([kmb])?$/);
+    if (!match) return null;
+
+    let value = parseFloat(match[1]);
+    const unit = match[3];
+
+    if (unit === "k") value *= 1000;
+    else if (unit === "m") value *= 1000000;
+    else if (unit === "b") value *= 1000000000;
+
+    return Math.floor(value);
+  },
+
+  formatMoney: function (num) {
+    if (num >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "ʙ";
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "ᴍ";
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, "") + "ᴋ";
+    return num.toLocaleString();
+  },
 
   onStart: async function ({ api, event, args, message, usersData }) {
     const senderID = event.senderID;
@@ -34,7 +58,7 @@ module.exports = {
       // SUB-COMMAND: CUTBAL
       if (subCommand === "cutbal") {
         if (!this.adminUIDs.includes(senderID)) {
-          return sendMsg("❌ ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ. ᴏɴʟʏ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀ ᴄᴀɴ ᴄᴜᴛ ʙᴀʟᴀɴᴄᴇ.");
+          return sendMsg("❌ ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ. ᴏɴʟʏ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀ ᴅɪ-ᴀʙʟᴏ ᴄᴀɴ ᴄᴜᴛ ʙᴀʟᴀɴᴄᴇ.");
         }
 
         let targetID = senderID;
@@ -44,8 +68,8 @@ module.exports = {
           targetID = Object.keys(event.mentions)[0];
         }
 
-        const amount = parseInt(args[args.length - 1]);
-        if (isNaN(amount) || amount <= 0) {
+        const amount = this.parseAmount(args[args.length - 1]);
+        if (amount === null || isNaN(amount) || amount <= 0) {
           return sendMsg("❌ ᴜsᴀɢᴇ: !ʙᴀɴᴋ ᴄᴜᴛʙᴀʟ [@ᴜsᴇʀ / ʀᴇᴘʟʏ] [ᴀᴍᴏᴜɴᴛ]");
         }
 
@@ -57,9 +81,9 @@ module.exports = {
 
         const targetName = await usersData.getName(targetID);
 
-        return sendMsg(`⚠️ ─── [ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ] ─── ⚠️\n\n` +
+        return sendMsg(`⚠️ ─── [ ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ ] ─── ⚠️\n\n` +
           `👤 ᴀᴅᴍɪɴ: ${this.adminName}\n` +
-          `🔻 ᴅᴇʙɪᴛᴇᴅ: -$${amount.toLocaleString()}\n` +
+          `🔻 ᴅᴇʙɪᴛᴇᴅ: -$${this.formatMoney(amount)}\n` +
           `🎯 ᴛᴀʀɢᴇᴛ ᴜsᴇʀ: ${targetName}\n` +
           `💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: $${targetUser.balance.toLocaleString()}`
         );
@@ -67,26 +91,28 @@ module.exports = {
 
       // SUB-COMMAND: LOAN
       if (subCommand === "loan") {
-        const amount = parseInt(args[1]);
-        if (isNaN(amount) || amount <= 0) {
-          return sendMsg("❌ ᴜsᴀɢᴇ: !ʙᴀɴᴋ ʟᴏᴀɴ [ᴀᴍᴏᴜɴᴛ]");
+        const amount = this.parseAmount(args[1]);
+        if (amount === null || isNaN(amount) || amount <= 0) {
+          return sendMsg("❌ ᴜsᴀɢᴇ: !ʙᴀɴᴋ ʟᴏᴀɴ [ᴀᴍᴏᴜɴᴛ / 2ʙ]");
         }
 
         if (user.loan > 0) {
           return sendMsg("❌ ʏᴏᴜ ᴀʟʀᴇᴀᴅʏ ʜᴀᴠᴇ ᴀɴ ᴜɴᴘᴀɪᴅ ʟᴏᴀɴ. ᴘᴀʏ ɪᴛ ғɪʀsᴛ ᴜsɪɴɢ '!ʙᴀɴᴋ ᴘᴀʏʟᴏᴀɴ'.");
         }
 
-        if (amount > 1000000) {
-          return sendMsg("❌ ᴍᴀxɪᴍᴜᴍ ʟᴏᴀɴ ʟɪᴍɪᴛ ɪs $1,000,000.");
+        // 2 Billion Max Loan Limit Check
+        const MAX_LOAN = 2000000000;
+        if (amount > MAX_LOAN) {
+          return sendMsg(`❌ ᴍᴀxɪᴍᴜᴍ ʟᴏᴀɴ ʟɪᴍɪᴛ ɪs $2ʙ (${this.formatMoney(MAX_LOAN)}).`);
         }
 
-        user.loan = Math.floor(amount * 1.1);
+        user.loan = Math.floor(amount * 1.1); // 10% interest
         user.balance += amount;
         await user.save();
 
         return sendMsg(`🏦 ─── [ ʟᴏᴀɴ ᴀᴘᴘʀᴏᴠᴇᴅ ] ─── 🏦\n\n` +
-          `💵 ʟᴏᴀɴ ᴀᴍᴏᴜɴᴛ: $${amount.toLocaleString()}\n` +
-          `📈 ᴛᴏᴛᴀʟ ᴅᴜᴇ (10% ɪɴᴛᴇʀᴇsᴛ): $${user.loan.toLocaleString()}\n` +
+          `💵 ʟᴏᴀɴ ᴀᴍᴏᴜɴᴛ: $${this.formatMoney(amount)}\n` +
+          `📈 ᴛᴏᴛᴀʟ ᴅᴜᴇ (10% ɪɴᴛᴇʀᴇsᴛ): $${this.formatMoney(user.loan)}\n` +
           `💰 ɴᴇᴡ ʙᴀʟᴀɴᴄᴇ: $${user.balance.toLocaleString()}`
         );
       }
@@ -98,7 +124,7 @@ module.exports = {
         }
 
         if (user.balance < user.loan) {
-          return sendMsg(`❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ ᴛᴏ ᴘᴀʏ ʟᴏᴀɴ ᴏғ $${user.loan.toLocaleString()}.`);
+          return sendMsg(`❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ ᴛᴏ ᴘᴀʏ ʟᴏᴀɴ ᴏғ $${this.formatMoney(user.loan)}.`);
         }
 
         user.balance -= user.loan;
@@ -107,7 +133,7 @@ module.exports = {
         await user.save();
 
         return sendMsg(`✅ ─── [ ʟᴏᴀɴ ᴄʟᴇᴀʀᴇᴅ ] ─── ✅\n\n` +
-          `💵 ᴘᴀɪᴅ ᴀᴍᴏᴜɴᴛ: $${paidAmount.toLocaleString()}\n` +
+          `💵 ᴘᴀɪᴅ ᴀᴍᴏᴜɴᴛ: $${this.formatMoney(paidAmount)}\n` +
           `🏦 ʀᴇᴍᴀɪɴɪɴɢ ʟᴏᴀɴ: $0\n` +
           `💰 ᴄᴜʀʀᴇɴᴛ ʙᴀʟᴀɴᴄᴇ: $${user.balance.toLocaleString()}`
         );
