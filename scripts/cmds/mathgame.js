@@ -1,118 +1,113 @@
 const axios = require("axios");
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema({
+    userID: { type: String, required: true, unique: true },
+    wallet: { type: Number, default: 1000 },
+    exp: { type: Number, default: 0 }
+});
+
+const User = mongoose.models.BankUser || mongoose.model("BankUser", userSchema);
 
 const mahmud = async () => {
-        const res = await axios.get("https://raw.githubusercontent.com/mahmudx7/HINATA/main/baseApiUrl.json");
-        return res.data.mahmud;
+    const res = await axios.get("https://raw.githubusercontent.com/mahmudx7/HINATA/main/baseApiUrl.json");
+    return res.data.mahmud;
 };
 
 module.exports = {
-        config: {
-                name: "mathgame",
-                aliases: ["math"],
-                version: "1.7",
-                author: "MahMUD",
-                countDown: 10,
-                role: 0,
-                description: {
-                        bn: "মজার গণিত কুইজ খেলে কয়েন এবং এক্সপি জিতুন",
-                        en: "Play fun math quizzes to win coins and exp",
-                        vi: "Chơi đố vui toán học để giành được xu và exp"
-                },
-                category: "game",
-                guide: {
-                        bn: '   {pn}',
-                        en: '   {pn}',
-                        vi: '   {pn}'
-                }
+    config: {
+        name: "mathgame",
+        aliases: ["math"],
+        version: "2.0",
+        author: "Pratik Shah",
+        countDown: 10,
+        role: 0,
+        description: {
+            en: "Play fun math quizzes to win coins and exp in Royal Vault"
         },
-
-        langs: {
-                bn: {
-                        reply: "𝐑𝐞𝐩𝐥𝐲 𝐰𝐢𝐭𝐡 𝐲𝐨𝐮𝐫 𝐚𝐧𝐬𝐰𝐞𝐫.",
-                        correct: "✅ | একদম সঠিক উত্তর বেবি!\n\nতুমি জিতেছো %1 কয়েন এবং %2 এক্সপি।",
-                        wrong: "❌ | উত্তরটি ভুল হয়েছে বেবি!\n\nসঠিক উত্তর ছিল: %1",
-                        notYour: "× বেবি, এটি তোমার কুইজ নয়! নিজের জন্য শুরু করো। >🐸",
-                        error: "× সমস্যা হয়েছে: %1। প্রয়োজনে Contact MahMUD।"
-                },
-                en: {
-                        reply: "𝐑𝐞𝐩𝐥𝐲 𝐰𝐢𝐭𝐡 𝐲𝐨𝐮𝐫 𝐚𝐧𝐬𝐰𝐞𝐫.",
-                        correct: "✅ | Correct answer baby!\n\nYou earned %1 coins & %2 exp.",
-                        wrong: "❌ | Wrong answer baby!\n\nThe correct answer was: %1",
-                        notYour: "𝐓𝐡𝐢𝐬 𝐢𝐬 𝐧𝐨𝐭 𝐲𝐨𝐮𝐫 𝐪𝐮𝐢𝐳 𝐛𝐚𝐛𝐲 >🐸",
-                        error: "× API error: %1. Contact MahMUD for help."
-                },
-                vi: {
-                        reply: "Trả lời bằng đáp án của bạn đi cưng",
-                        correct: "✅ | Đáp án chính xác cưng ơi!\n\nBạn nhận được %1 xu & %2 exp.",
-                        wrong: "❌ | Sai rồi cưng ơi!\n\n💡 Đáp án đúng là: %1",
-                        notYour: "× Đây không phải câu đố của bạn cưng à! >🐸",
-                        error: "× Lỗi: %1. Liên hệ MahMUD để được hỗ trợ."
-                }
-        },
-
-        onStart: async function ({ api, event, getLang }) {
-                const authorName = String.fromCharCode(77, 97, 104, 77, 85, 68); 
-                if (this.config.author !== authorName) {
-                        return api.sendMessage("You are not authorized to change the author name.", event.threadID, event.messageID);
-                }
-                
-                try {
-                        const apiUrl = await mahmud();
-                        const res = await axios.get(`${apiUrl}/api/math`);
-                        const quiz = res.data?.data || res.data;
-
-                        if (!quiz) return api.sendMessage("× No math quiz available baby.", event.threadID, event.messageID);
-
-                        const { question, correctAnswer, options } = quiz;
-                        const { a, b, c, d } = options;
-
-                        const quizMsg = `\n╭──✦ ${question}\n`
-                                + `├‣ 𝗔) ${a}\n`
-                                + `├‣ 𝗕) ${b}\n`
-                                + `├‣ 𝗖) ${c}\n`
-                                + `├‣ 𝗗) ${d}\n`
-                                + `╰──────────────────‣\n`
-                                + `${getLang("reply")}`;
-
-                        api.sendMessage(quizMsg, event.threadID, (error, info) => {
-                                global.GoatBot.onReply.set(info.messageID, {
-                                        type: "reply",
-                                        commandName: this.config.name,
-                                        author: event.senderID,
-                                        messageID: info.messageID,
-                                        correctAnswer
-                                });
-
-                                setTimeout(() => {
-                                        api.unsendMessage(info.messageID);
-                                }, 40000);
-                        }, event.messageID);
-
-                } catch (error) {
-                        api.sendMessage(getLang("error", error.message), event.threadID, event.messageID);
-                }
-        },
-
-        onReply: async function ({ event, api, Reply, usersData, getLang }) {
-                const { correctAnswer, author } = Reply;
-                if (event.senderID !== author) return api.sendMessage(getLang("notYour"), event.threadID, event.messageID);
-
-                const userReply = event.body.trim().toLowerCase();
-                const userData = await usersData.get(author);
-                const rewardCoins = 500;
-                const rewardExp = 121;
-
-                await api.unsendMessage(Reply.messageID);
-
-                if (userReply === correctAnswer.toLowerCase()) {
-                        await usersData.set(author, {
-                                money: userData.money + rewardCoins,
-                                exp: userData.exp + rewardExp,
-                                data: userData.data
-                        });
-                        return api.sendMessage(getLang("correct", rewardCoins, rewardExp), event.threadID, event.messageID);
-                } else {
-                        return api.sendMessage(getLang("wrong", correctAnswer), event.threadID, event.messageID);
-                }
+        category: "games",
+        guide: {
+            en: "  {pn}"
         }
+    },
+
+    langs: {
+        en: {
+            reply: "  💬 ʀᴇᴘʟʏ ᴡɪᴛʜ ʏᴏᴜʀ ᴀɴsᴡᴇʀ (ᴀ, ʙ, ᴄ, ᴏʀ ᴅ).",
+            correct: "╔══ [ 🎉 ᴄᴏʀʀᴇᴄᴛ ᴀɴsᴡᴇʀ ] ══╗\n  ᴄᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴs! ʏᴏᴜ ᴡᴏɴ $1,000,000 ᴄᴏɪɴs ᴀɴᴅ 121 ᴇxᴘ!\n╚═══════════════════════════╝",
+            wrong: "╔══ [ ❌ ᴡʀᴏɴɢ ᴀɴsᴡᴇʀ ] ══╗\n  ᴛʜᴇ ᴄᴏʀʀᴇᴄᴛ ᴀɴsᴡᴇʀ ᴡᴀs: %1\n╚══════════════════════════╝",
+            notYour: "╔══ [ ⚠️ ᴅᴇɴɪᴇᴅ ] ══╗\n  ᴛʜɪs ɪs ɴᴏᴛ ʏᴏᴜʀ ǫᴜɪᴢ!\n╚═════════════════════╝",
+            error: "╔══ [ ❌ ᴇʀʀᴏʀ ] ══╗\n  ᴀᴘɪ ᴇʀʀᴏʀ: %1\n╚═══════════════════╝"
+        }
+    },
+
+    onStart: async function ({ api, event, getLang }) {
+        const BANK_NAME = "🏛️ ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ ʀᴏʏᴀʟ ᴠᴀᴜʟᴛ 🏛️";
+
+        try {
+            const apiUrl = await mahmud();
+            const res = await axios.get(`${apiUrl}/api/math`);
+            const quiz = res.data?.data || res.data;
+
+            if (!quiz) return api.sendMessage("╔══ [ ❌ ᴇʀʀᴏʀ ] ══╗\n  ɴᴏ ᴍᴀᴛʜ ǫᴜɪᴢ ᴀᴠᴀɪʟᴀʙʟᴇ.\n╚═══════════════════╝", event.threadID, event.messageID);
+
+            const { question, correctAnswer, options } = quiz;
+            const { a, b, c, d } = options;
+
+            let quizMsg = `╔════════════════════════════════╗\n`;
+            quizMsg +=    `      🧠 ᴍᴀᴛʜ ǫᴜɪᴢ ᴄʜᴀʟʟᴇɴɢᴇ 🧠\n`;
+            quizMsg +=    `╠════════════════════════════════╣\n`;
+            quizMsg +=    `  ❓ ǫᴜᴇsᴛɪᴏɴ: ${question}\n`;
+            quizMsg +=    `╠════════════════════════════════╣\n`;
+            quizMsg +=    `  🅰️ ${a}\n`;
+            quizMsg +=    `  🅱️ ${b}\n`;
+            quizMsg +=    `  🅲️ ${c}\n`;
+            quizMsg +=    `  🅳️ ${d}\n`;
+            quizMsg +=    `╠════════════════════════════════╣\n`;
+            quizMsg +=    `  🎁 ʀᴇᴡᴀʀᴅ: $1,000,000 ᴄᴏɪɴs + 121 ᴇxᴘ\n`;
+            quizMsg +=    `${getLang("reply")}\n`;
+            quizMsg +=    `╠════════════════════════════════╣\n`;
+            quizMsg +=    `  🏦 ${BANK_NAME}\n`;
+            quizMsg +=    `╚════════════════════════════════╝`;
+
+            api.sendMessage(quizMsg, event.threadID, (error, info) => {
+                global.GoatBot.onReply.set(info.messageID, {
+                    type: "reply",
+                    commandName: this.config.name,
+                    author: event.senderID,
+                    messageID: info.messageID,
+                    correctAnswer
+                });
+
+                setTimeout(() => {
+                    api.unsendMessage(info.messageID);
+                }, 40000);
+            }, event.messageID);
+
+        } catch (error) {
+            api.sendMessage(getLang("error", error.message), event.threadID, event.messageID);
+        }
+    },
+
+    onReply: async function ({ event, api, Reply, getLang }) {
+        const { correctAnswer, author } = Reply;
+        if (event.senderID !== author) return api.sendMessage(getLang("notYour"), event.threadID, event.messageID);
+
+        const userReply = event.body.trim().toLowerCase();
+        const rewardCoins = 1000000;
+        const rewardExp = 121;
+
+        await api.unsendMessage(Reply.messageID);
+
+        if (userReply === correctAnswer.toLowerCase()) {
+            let user = await User.findOne({ userID: author }) || await User.create({ userID: author });
+            user.wallet += rewardCoins;
+            user.exp += rewardExp;
+            await user.save();
+
+            return api.sendMessage(getLang("correct"), event.threadID, event.messageID);
+        } else {
+            return api.sendMessage(getLang("wrong", correctAnswer), event.threadID, event.messageID);
+        }
+    }
 };
