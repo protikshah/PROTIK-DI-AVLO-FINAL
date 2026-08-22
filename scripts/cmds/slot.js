@@ -1,8 +1,10 @@
 const mongoose = require("mongoose");
 
-const UserSchema = new mongoose.Schema({
+// Mongoose Schema with strict field initialization
+const bankUserSchema = new mongoose.Schema({
   userID: { type: String, required: true, unique: true },
   balance: { type: Number, default: 0 },
+  loan: { type: Number, default: 0 },
   slotWins: { type: Number, default: 0 },
   slotTotal: { type: Number, default: 0 },
   lastSlotDate: { type: String, default: "" },
@@ -10,17 +12,17 @@ const UserSchema = new mongoose.Schema({
   slotWindowStart: { type: Number, default: 0 }
 });
 
-const BankUser = mongoose.models.DiabloBankUser || mongoose.model("DiabloBankUser", UserSchema);
+const BankUser = mongoose.models.DiabloBankUser || mongoose.model("DiabloBankUser", bankUserSchema);
 
 module.exports = {
   config: {
     name: "slot",
     aliases: ["slots"],
-    version: "1.2.0",
+    version: "1.3.0",
     author: "DI-ABLO JI-SOO",
     countDown: 2,
     role: 0,
-    shortDescription: "Play casino slot game with limit and max bet",
+    shortDescription: "Play casino slot game",
     category: "game",
     guide: { en: "{p}slot [amount / 2m / 5k / all]" }
   },
@@ -45,6 +47,7 @@ module.exports = {
 
   formatMoney: function (num) {
     if (num >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "ʙ";
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "ᴍ";
     if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, "") + "ᴋ";
     return num.toLocaleString();
   },
@@ -55,20 +58,21 @@ module.exports = {
 
     try {
       let user = await BankUser.findOne({ userID: senderID });
-      if (!user) user = await BankUser.create({ userID: senderID, balance: 1000 });
-
-      if (!args[0]) {
-        return sendMsg("❌ ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴀ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ. ᴇxᴀᴍᴘʟᴇ: !sʟᴏᴛ 2ᴍ");
+      if (!user) {
+        user = await BankUser.create({ userID: senderID, balance: 1000 });
       }
 
-      let betAmount = this.parseAmount(args[0], user.balance);
+      if (!args[0]) {
+        return sendMsg("❌ ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴀ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ. ᴇxᴀᴍᴘʟᴇ: #sʟᴏᴛ 2ᴍ");
+      }
+
+      const betAmount = this.parseAmount(args[0], user.balance);
 
       if (betAmount === null || isNaN(betAmount) || betAmount <= 0) {
         return sendMsg("❌ ɪɴᴠᴀʟɪᴅ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ!");
       }
 
-      // 50 Billion Max Bet Limit
-      const MAX_BET = 50000000000; 
+      const MAX_BET = 50000000000; // 50 Billion Limit
       if (betAmount > MAX_BET) {
         return sendMsg(`❌ ᴍᴀxɪᴍᴜᴍ ʙᴇᴛ ʟɪᴍɪᴛ ɪs $50ʙ (${this.formatMoney(MAX_BET)}).`);
       }
@@ -77,17 +81,20 @@ module.exports = {
         return sendMsg(`❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ! ʏᴏᴜ ʜᴀᴠᴇ $${user.balance.toLocaleString()}.`);
       }
 
-      // 5 Hours Cooldown & 30 Spins Limit Check
+      // 5 Hours Cooldown & 30 Spins Limit Logic
       const now = Date.now();
       const FIVE_HOURS = 5 * 60 * 60 * 1000;
 
-      if (!user.slotWindowStart || (now - user.slotWindowStart) > FIVE_HOURS) {
-        user.slotWindowStart = now;
-        user.slotCount = 0;
+      let windowStart = user.slotWindowStart || 0;
+      let currentCount = user.slotCount || 0;
+
+      if (!windowStart || (now - windowStart) > FIVE_HOURS) {
+        windowStart = now;
+        currentCount = 0;
       }
 
-      if (user.slotCount >= 30) {
-        const remainingMs = FIVE_HOURS - (now - user.slotWindowStart);
+      if (currentCount >= 30) {
+        const remainingMs = FIVE_HOURS - (now - windowStart);
         const remainingMins = Math.ceil(remainingMs / (60 * 1000));
         const hours = Math.floor(remainingMins / 60);
         const mins = remainingMins % 60;
@@ -96,12 +103,14 @@ module.exports = {
         return sendMsg(`❌ ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴀᴄʜᴇᴅ ᴛʜᴇ ʟɪᴍɪᴛ ᴏғ 30 sᴘɪɴs ᴘᴇʀ 5 ʜᴏᴜʀs.\n⏳ ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ${timeStr} ᴛᴏ ᴘʟᴀʏ ᴀɢᴀɪɴ.`);
       }
 
-      // Daily Reset Stats
+      // Daily Reset Check
       const today = new Date().toISOString().slice(0, 10);
+      let wins = user.slotWins || 0;
+      let total = user.slotTotal || 0;
+
       if (user.lastSlotDate !== today) {
-        user.slotWins = 0;
-        user.slotTotal = 0;
-        user.lastSlotDate = today;
+        wins = 0;
+        total = 0;
       }
 
       // Heart Icons for Slot
@@ -117,29 +126,43 @@ module.exports = {
         winMultiplier = 2;
       }
 
-      user.slotTotal += 1;
-      user.slotCount += 1;
+      total += 1;
+      currentCount += 1;
       let resultText = "";
+      let newBalance = user.balance;
 
       if (winMultiplier > 0) {
-        user.slotWins += 1;
+        wins += 1;
         const prize = betAmount * winMultiplier;
-        user.balance += (prize - betAmount);
+        newBalance = user.balance + (prize - betAmount);
         resultText = `• ʙᴀʙʏ, ʏᴏᴜ ᴡᴏɴ $${this.formatMoney(prize)}`;
       } else {
-        user.balance -= betAmount;
+        newBalance = user.balance - betAmount;
         resultText = `• ʙᴀʙʏ, ʏᴏᴜ ʟᴏsᴛ $${this.formatMoney(betAmount)}`;
       }
 
-      await user.save();
+      // Explicit MongoDB Update
+      await BankUser.updateOne(
+        { userID: senderID },
+        {
+          $set: {
+            balance: newBalance,
+            slotWins: wins,
+            slotTotal: total,
+            lastSlotDate: today,
+            slotCount: currentCount,
+            slotWindowStart: windowStart
+          }
+        }
+      );
 
-      const winRate = ((user.slotWins / user.slotTotal) * 100).toFixed(1);
+      const winRate = ((wins / total) * 100).toFixed(1);
 
       const response = `> 🎀\n` +
         `${resultText}\n` +
         `• ɢᴀᴍᴇ ʀᴇsᴜʟᴛs: [ ${icon1} | ${icon2} | ${icon3} ]\n\n` +
-        `🎯 ᴡɪɴ ʀᴀᴛᴇ ᴛᴏᴅᴀʏ: ${winRate}% (${user.slotWins}/${user.slotTotal})\n` +
-        `🎰 sᴘɪɴs ʟᴇғᴛ (5ʜ): ${30 - user.slotCount}/30`;
+        `🎯 ᴡɪɴ ʀᴀᴛᴇ ᴛᴏᴅᴀʏ: ${winRate}% (${wins}/${total})\n` +
+        `🎰 sᴘɪɴs ʟᴇғᴛ (5ʜ): ${30 - currentCount}/30`;
 
       return sendMsg(response);
     } catch (err) {
