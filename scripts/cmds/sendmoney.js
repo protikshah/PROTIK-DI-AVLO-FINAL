@@ -1,119 +1,70 @@
+const mongoose = require("mongoose");
+
+const BankUser = mongoose.models.DiabloBankUser || mongoose.model("DiabloBankUser", new mongoose.Schema({
+  userID: { type: String, required: true, unique: true },
+  balance: { type: Number, default: 0 },
+  loan: { type: Number, default: 0 }
+}));
+
 module.exports = {
   config: {
     name: "sendmoney",
     aliases: ["pay"],
-    version: "2.0",
-    author: "Protik / Assistant",
-    countDown: 5,
+    version: "1.0.0",
+    author: "DI-ABLO JI-SOO",
+    countDown: 2,
     role: 0,
-    shortDescription: { en: "Send money to another user" },
+    shortDescription: "Send money to another user",
     category: "economy",
-    guide: { en: "{pn} [@mention / reply / UID] [amount]" }
+    guide: { en: "{p}sendmoney [@user / reply] [amount]" }
   },
 
-  onStart: async function ({ message, event, args, usersData }) {
-    const { senderID, mentions, messageReply } = event;
+  onStart: async function ({ api, event, args, message }) {
+    const senderID = event.senderID;
+    const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
 
-    // Helper to parse inputs like 5k, 1m, 2b to actual numbers
-    const parseAmount = (str) => {
-      if (!str) return NaN;
-      let numStr = str.toLowerCase().trim();
-      let multiplier = 1;
+    let targetID = null;
+    if (event.type === "message_reply") {
+      targetID = event.messageReply.senderID;
+    } else if (Object.keys(event.mentions || {}).length > 0) {
+      targetID = Object.keys(event.mentions)[0];
+    }
 
-      if (numStr.endsWith("k")) {
-        multiplier = 1000;
-        numStr = numStr.slice(0, -1);
-      } else if (numStr.endsWith("m")) {
-        multiplier = 1000000;
-        numStr = numStr.slice(0, -1);
-      } else if (numStr.endsWith("b")) {
-        multiplier = 1000000000;
-        numStr = numStr.slice(0, -1);
+    if (!targetID || targetID === senderID) {
+      return sendMsg("❌ ʏᴏᴜ ᴍᴜsᴛ ᴍᴇɴᴛɪᴏɴ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀɴᴏᴛʜᴇʀ ᴜsᴇʀ ᴛᴏ sᴇɴᴅ ᴍᴏɴᴇʏ.");
+    }
+
+    const amount = parseInt(args[args.length - 1]);
+    if (isNaN(amount) || amount <= 0) {
+      return sendMsg("❌ ᴜsᴀɢᴇ: !sᴇɴᴅᴍᴏɴᴇʏ [@ᴜsᴇʀ / ʀᴇᴘʟʏ] [ᴀᴍᴏᴜɴᴛ]");
+    }
+
+    try {
+      let sender = await BankUser.findOne({ userID: senderID });
+      if (!sender) sender = await BankUser.create({ userID: senderID, balance: 1000, loan: 0 });
+
+      if (sender.balance < amount) {
+        return sendMsg("❌ ᴛʀᴀɴsᴀᴄᴛɪᴏɴ ғᴀɪʟᴇᴅ. ɪɴsᴜғғɪᴄɪᴇɴᴛ ʙᴀʟᴀɴᴄᴇ.");
       }
 
-      const val = parseFloat(numStr);
-      return isNaN(val) ? NaN : Math.floor(val * multiplier);
-    };
+      let target = await BankUser.findOne({ userID: targetID });
+      if (!target) target = await BankUser.create({ userID: targetID, balance: 1000, loan: 0 });
 
-    // Helper to format money for output
-    const formatMoney = (num) => {
-      if (num >= 1000000000) return (num / 1000000000).toFixed(1) + "B";
-      if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
-      if (num >= 1000) return (num / 1000).toFixed(1) + "K";
-      return num.toLocaleString();
-    };
+      sender.balance -= amount;
+      target.balance += amount;
 
-    let receiverID = null;
-    let amountRaw = null;
+      await sender.save();
+      await target.save();
 
-    // 1. If replied to a message
-    if (messageReply) {
-      receiverID = messageReply.senderID;
-      amountRaw = args[0];
-    } 
-    // 2. If mentioned a user
-    else if (Object.keys(mentions).length > 0) {
-      receiverID = Object.keys(mentions)[0];
-      // Take the last argument as amount (handles names with spaces)
-      amountRaw = args[args.length - 1];
-    } 
-    // 3. If passed UID directly
-    else if (args.length >= 2 && !isNaN(args[0])) {
-      receiverID = args[0];
-      amountRaw = args[1];
-    }
-
-    if (!receiverID || !amountRaw) {
-      return message.reply(
-        `> 💸\n` +
-        `• Usage: #sendmoney [@mention / reply / UID] [amount]\n` +
-        `• Example: #sendmoney @friend 10000 or #sendmoney 5m`
+      return sendMsg(`💸 ─── [ᴛʀᴀɴsᴀᴄᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ] ─── 💸\n\n` +
+        `📤 sᴇɴᴅᴇʀ: ${senderID}\n` +
+        `📥 ʀᴇᴄᴇɪᴠᴇʀ: ${targetID}\n` +
+        `💵 ᴀᴍᴏᴜɴᴛ: $${amount.toLocaleString()}\n` +
+        `💰 ʏᴏᴜʀ ʀᴇᴍᴀɪɴɪɴɢ ʙᴀʟᴀɴᴄᴇ: $${sender.balance.toLocaleString()}`
       );
+    } catch (err) {
+      console.error(err);
+      return sendMsg("❌ ᴛʀᴀɴsᴀᴄᴛɪᴏɴ ғᴀɪʟᴇᴅ.");
     }
-
-    if (receiverID === senderID) {
-      return message.reply("> ⚠️\n• আপনি নিজেকে টাকা পাঠাতে পারবেন না!");
-    }
-
-    const amount = parseAmount(amountRaw);
-
-    if (isNaN(amount) || amount <= 0) {
-      return message.reply("> 💸\n• Please enter a valid transfer amount!");
-    }
-
-    // Fetch Sender Data
-    let senderData = await usersData.get(senderID);
-    let senderBalance = typeof senderData.money === "number" ? senderData.money : (senderData.data?.money || 0);
-
-    if (senderBalance < amount) {
-      return message.reply(`> ❌\n• আপনার অ্যাকাউন্টে পর্যাপ্ত টাকা নেই!\n• বর্তমান ব্যালেন্স: $${formatMoney(senderBalance)}`);
-    }
-
-    // Fetch Receiver Data
-    let receiverData = await usersData.get(receiverID);
-    let receiverBalance = typeof receiverData.money === "number" ? receiverData.money : (receiverData.data?.money || 0);
-
-    // Update Balances
-    const newSenderBalance = senderBalance - amount;
-    const newReceiverBalance = receiverBalance + amount;
-
-    senderData.money = newSenderBalance;
-    if (senderData.data) senderData.data.money = newSenderBalance;
-
-    receiverData.money = newReceiverBalance;
-    if (receiverData.data) receiverData.data.money = newReceiverBalance;
-
-    // Save to database
-    await usersData.set(senderID, senderData);
-    await usersData.set(receiverID, receiverData);
-
-    const receiverName = receiverData.name || "ইউজার";
-
-    return message.reply(
-      `> 💸  [ TRANSFER SUCCESSFUL ]  💸\n\n` +
-      `• Sent To: ${receiverName}\n` +
-      `• Amount Transferred: $${formatMoney(amount)}\n` +
-      `• Your New Balance: $${formatMoney(newSenderBalance)}`
-    );
   }
 };
