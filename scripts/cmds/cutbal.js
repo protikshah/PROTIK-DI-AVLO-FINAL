@@ -18,7 +18,7 @@ module.exports = {
     guide: { en: "{p}cutbal [@user / reply] [amount]" }
   },
 
-  adminUIDs: ["100000000000000"], // Replace with your Facebook UID
+  adminUIDs: ["61591412309835"], // Replace with your Facebook UID
   adminName: "ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ",
 
   parseAmount: function (str) {
