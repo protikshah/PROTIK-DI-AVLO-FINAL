@@ -1,52 +1,97 @@
-module.exports.config = {
-    name: "crash",
-    version: "1.0.0",
-    role: 0,
-    credits: "Pratik Shah",
-    description: "রকেট ক্র্যাশ করার আগে মাল্টিপ্লায়ারে ক্যাশআউট করুন",
-    category: "games",
-    guide: {
-        en: "{pref}crash <টার্গেট যেমন: 1.5/2.0> <বাজি>"
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema({
+    userID: { type: String, required: true, unique: true },
+    wallet: { type: Number, default: 1000 },
+    bank: { type: Number, default: 0 }
+});
+
+const User = mongoose.models.BankUser || mongoose.model("BankUser", userSchema);
+
+module.exports = {
+    config: {
+        name: "crash",
+        version: "2.0.0",
+        role: 0,
+        author: "Pratik Shah",
+        description: { en: "Cash out before the rocket crashes for dynamic vault rewards" },
+        category: "games",
+        guide: {
+            en: "{pn} <target_multiplier e.g. 1.5/2.0> <bet_amount>"
+        },
+        countDown: 5
     },
-    countDown: 10
-};
 
-module.exports.onStart = async function({ api, event, args, usersData }) {
-    const { threadID, messageID, senderID } = event;
-    const targetMulti = parseFloat(args[0]);
-    const bet = parseInt(args[1]);
+    onStart: async function ({ api, event, args, message }) {
+        const { threadID, messageID, senderID } = event;
+        const BANK_NAME = "🏛️ ᴅɪ-ᴀʙʟᴏ ᴊɪ-sᴏᴏ ʀᴏʏᴀʟ ᴠᴀᴜʟᴛ 🏛️";
 
-    if (isNaN(targetMulti) || targetMulti < 1.1) return api.sendMessage("❌ [SYSTEM]: সর্বনিম্ন মাল্টিপ্লায়ার 1.1 দিতে হবে।\nউদাহরণ: #crash 2.5 300", threadID, messageID);
-    if (isNaN(bet) || bet <= 0) return api.sendMessage("❌ [SYSTEM]: সঠিক বাজির পরিমাণ দিন।", threadID, messageID);
+        const parseBet = (input) => {
+            if (!input) return NaN;
+            const lower = input.toLowerCase();
+            if (lower.endsWith("k")) return parseFloat(lower) * 1000;
+            if (lower.endsWith("m")) return parseFloat(lower) * 1000000;
+            if (lower.endsWith("b")) return parseFloat(lower) * 1000000000;
+            return parseInt(input);
+        };
 
-    let userData = await usersData.get(senderID);
-    let userMoney = userData.money || 0;
+        const targetMulti = parseFloat(args[0]);
+        const bet = parseBet(args[1]);
 
-    if (bet > userMoney) return api.sendMessage(`❌ [SYSTEM]: আপনার কাছে পর্যাপ্ত কয়েন নেই!`, threadID, messageID);
+        if (isNaN(targetMulti) || targetMulti < 1.1) {
+            return message.reply("╔══ [ ❌ ɪɴᴠᴀʟɪᴅ ᴍᴜʟᴛɪᴘʟɪᴇʀ ] ══╗\n  ᴍɪɴɪᴍᴜᴍ ᴍᴜʟᴛɪᴘʟɪᴇʀ ɪs 1.1x!\n  sʏɴᴛᴀx: #ᴄʀᴀsʜ <ᴍᴜʟᴛɪᴘʟɪᴇʀ> <ʙᴇᴛ>\n  ᴇxᴀᴍᴘʟᴇ: #ᴄʀᴀsʜ 2.5 500\n╚═════════════════════════════╝");
+        }
 
-    await usersData.set(senderID, { money: userMoney - bet });
+        if (isNaN(bet) || bet <= 0) {
+            return message.reply("╔══ [ ❌ ɪɴᴠᴀʟɪᴅ ʙᴇᴛ ] ══╗\n  ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴀ ᴠᴀʟɪᴅ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ!\n╚═══════════════════════╝");
+        }
 
-    const crashPoint = parseFloat((Math.random() * (5.0 - 1.0) + 1.0).toFixed(2));
+        let user = await User.findOne({ userID: senderID }) || await User.create({ userID: senderID });
 
-    let msg = `==========================\n`;
-    msg += `    🚀 ROCKET CRASH ARENA 🚀\n`;
-    msg += `==========================\n`;
-    msg += `🎯 ক্যাশআউট টার্গেট: [ ${targetMulti}x ]\n`;
-    msg += `💰 বাজির পরিমাণ: $${bet}\n`;
-    msg += `--------------------------\n`;
-    msg += `🚀 রকেট উড্ডয়ন করছে... 📈\n`;
-    msg += `💥 রকেট ক্র্যাশ করেছে: [ ${crashPoint}x ]-এ!\n`;
-    msg += `--------------------------\n`;
+        if (user.wallet < bet) {
+            return message.reply(
+                `╔══ [ ❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ғᴜɴᴅs ] ══╗\n` +
+                `  ʏᴏᴜ ɴᴇᴇᴅ $${bet.toLocaleString()} ɪɴ ʏᴏᴜʀ ᴡᴀʟʟᴇᴛ!\n` +
+                `  💡 ᴡɪᴛʜᴅʀᴀᴡ ғᴜɴᴅs: #ʙᴀɴᴋ ᴡɪᴛʜᴅʀᴀᴡ <ᴀᴍᴏᴜɴᴛ>\n` +
+                `╚════════════════════════════════╝`
+            );
+        }
 
-    if (targetMulti <= crashPoint) {
-        const reward = Math.floor(bet * targetMulti);
-        let currentData = await usersData.get(senderID);
-        await usersData.set(senderID, { money: (currentData.money || 0) + reward });
-        msg += `✅ ক্র্যাশের আগেই ক্যাশআউট সফল! \n🎉 আপনি জিতেছেন $${reward} কয়েন! 💸\n`;
-    } else {
-        msg += `💥 রকেট ক্র্যাশ করার পর আপনি ক্যাশআউট করতে চেয়েছেন!\n❌ আপনার $${bet} কয়েন পুরো ছাই হয়ে গেছে! 💀\n`;
+        user.wallet -= bet;
+
+        const crashPoint = parseFloat((Math.random() * (5.0 - 1.0) + 1.0).toFixed(2));
+        const isWin = targetMulti <= crashPoint;
+
+        let outcomeMsg = "";
+        let netProfit = 0;
+
+        if (isWin) {
+            const reward = Math.floor(bet * targetMulti);
+            user.wallet += reward;
+            netProfit = reward - bet;
+            outcomeMsg = `✅ ᴄᴀsʜᴏᴜᴛ sᴜᴄᴄᴇssғᴜʟ ʙᴇғᴏʀᴇ ᴄʀᴀsʜ!\n  🎉 ᴡɪɴɴɪɴɢs : +$${reward.toLocaleString()} (+$${netProfit.toLocaleString()} ɴᴇᴛ)`;
+        } else {
+            outcomeMsg = `💥 ʀᴏᴄᴋᴇᴛ ᴄʀᴀsʜᴇᴅ ʙᴇғᴏʀᴇ ʏᴏᴜʀ ᴄᴀsʜᴏᴜᴛ!\n  ❌ ʟᴏss     : -$${bet.toLocaleString()}`;
+        }
+
+        await user.save();
+
+        const response = 
+            `╔════════════════════════════════╗\n` +
+            `    🚀 ʀᴏᴄᴋᴇᴛ ᴄʀᴀsʜ ᴀʀᴇɴᴀ 🚀\n` +
+            `╠════════════════════════════════╣\n` +
+            `  🎯 ᴛᴀʀɢᴇᴛ   : [ ${targetMulti.toFixed(1)}x ]\n` +
+            `  💵 ʙᴇᴛ      : $${bet.toLocaleString()}\n` +
+            `  ───────────────────────────────\n` +
+            `  🚀 ᴛᴀᴋᴇᴏғғ... 📈\n` +
+            `  💥 ᴄʀᴀsʜᴇᴅ ᴀᴛ: [ ${crashPoint.toFixed(2)}x ]\n` +
+            `  ───────────────────────────────\n` +
+            `  ${outcomeMsg}\n` +
+            `  ───────────────────────────────\n` +
+            `  💳 ᴡᴀʟʟᴇᴛ ʙᴀʟᴀɴᴄᴇ : $${user.wallet.toLocaleString()}\n` +
+            `  🏦 ɪɴsᴛɪᴛᴜᴛɪᴏɴ     : ${BANK_NAME}\n` +
+            `╚════════════════════════════════╝`;
+
+        return message.reply(response);
     }
-    msg += `==========================`;
-
-    return api.sendMessage(msg, threadID, messageID);
 };
