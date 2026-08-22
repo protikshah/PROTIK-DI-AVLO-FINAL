@@ -25,11 +25,11 @@ module.exports = {
         name: "guessnumber",
         aliases: ["guessnum"],
         version: "2.0",
-        author: "Protik Shah",
+        author: "Pratik Shah",
         countDown: 5,
         role: 0,
         description: {
-            vi: "Game đoán số kết nối Royal Vault",
+            vi: "Guess number game with Royal Vault integration",
             en: "Guess number game connected to Royal Vault"
         },
         category: "games",
@@ -149,7 +149,7 @@ module.exports = {
         const gameData = guessNumberGame(options);
         gameData.mode = mode;
 
-        const messageData = message.reply(`${getLang("created", col, row)}\n\n🎮 Reply to the board below with ${col} digits to guess!`);
+        const messageData = message.reply(`${getLang("created", col, row)}\n\n🎮 ʀᴇᴘʟʏ ᴛᴏ ᴛʜᴇ ʙᴏᴀʀᴅ ʙᴇʟᴏᴡ ᴡɪᴛʜ ${col} ᴅɪɢɪᴛs ᴛᴏ ɢᴜᴇss!`);
         gameData.messageData = messageData;
 
         message.reply({
@@ -200,7 +200,6 @@ module.exports = {
                 attachment: gameData.imageStream
             });
 
-            // MongoDB Database Permanent Update
             let user = await User.findOne({ userID: event.senderID }) || await User.create({ userID: event.senderID });
             if (!user.guessNumberStats) {
                 user.guessNumberStats = { points: 0, wins: [], losses: [] };
