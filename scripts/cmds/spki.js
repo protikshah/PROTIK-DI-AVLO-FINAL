@@ -1,7 +1,7 @@
 module.exports = {
   config: {
-    name: "spamkick",
-    aliases: ["autokick"],
+    name: "spki",
+    aliases: ["aukick"],
     version: "1.0.2",
     author: "DI-ABLO JI-SOO",
     countDown: 0,
