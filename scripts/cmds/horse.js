@@ -12,10 +12,10 @@ module.exports.config = {
     version: "2.0.0",
     role: 0,
     credits: "Pratik Shah",
-    description: "রেস ট্র্যাকে ঘোড়ায় বাজি ধরুন (Royal Vault Connected)",
+    description: "Bet on horse racing with Royal Vault integration",
     category: "games",
     guide: {
-        en: "{pref}horse <ঘোড়া নম্বর ১-৪> <বাজি>"
+        en: "{pref}horse <Horse No. 1-4> <Bet Amount>"
     },
     countDown: 15
 };
@@ -30,8 +30,8 @@ module.exports.onStart = async function({ api, event, args }) {
     if (isNaN(chosenHorse) || chosenHorse < 1 || chosenHorse > 4) {
         return api.sendMessage(
             `╔══ [ ❌ ɪɴᴠᴀʟɪᴅ sᴇʟᴇᴄᴛɪᴏɴ ] ══╗\n` +
-            `  ১ থেকে ৪ নম্বর ঘোড়ার যেকোনো একটি বেছে নিন।\n` +
-            `  💡 উদাহরণ: #horse 3 500\n` +
+            `  ᴘʟᴇᴀsᴇ ᴄʜᴏᴏsᴇ ᴀ ʜᴏʀsᴇ ɴᴜᴍʙᴇʀ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 4.\n` +
+            `  💡 ᴇxᴀᴍᴘʟᴇ: #horse 3 500\n` +
             `╚═════════════════════════════╝`, 
             threadID, messageID
         );
@@ -40,26 +40,24 @@ module.exports.onStart = async function({ api, event, args }) {
     if (isNaN(bet) || bet <= 0) {
         return api.sendMessage(
             `╔══ [ ❌ ɪɴᴠᴀʟɪᴅ ʙᴇᴛ ] ══╗\n` +
-            `  সঠিক বাজির পরিমাণ দিন!\n` +
+            `  ᴘʟᴇᴀsᴇ ᴇɴᴛᴇʀ ᴀ ᴠᴀʟɪᴅ ʙᴇᴛ ᴀᴍᴏᴜɴᴛ!\n` +
             `╚════════════════════════╝`, 
             threadID, messageID
         );
     }
 
-    // Fetch user wallet from MongoDB
     let user = await User.findOne({ userID: senderID }) || await User.create({ userID: senderID });
 
     if (bet > user.wallet) {
         return api.sendMessage(
             `╔══ [ ❌ ɪɴsᴜғғɪᴄɪᴇɴᴛ ғᴜɴᴅs ] ══╗\n` +
-            `  আপনার রয়্যাল ওয়ালেটে পর্যাপ্ত কয়েন নেই!\n` +
-            `  💰 বর্তমান ব্যালেন্স: $${user.wallet}\n` +
+            `  ʏᴏᴜ ᴅᴏ ɴᴏᴛ ʜᴀᴠᴇ ᴇɴᴏᴜɢʜ ᴄᴏɪɴs ɪɴ ʏᴏᴜʀ ᴠᴀᴜʟᴛ!\n` +
+            `  💰 ᴄᴜʀʀᴇɴᴛ ʙᴀʟᴀɴᴄᴇ: $${user.wallet}\n` +
             `╚═══════════════════════════════╝`, 
             threadID, messageID
         );
     }
 
-    // Deduct bet amount
     user.wallet -= bet;
     await user.save();
 
