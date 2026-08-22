@@ -1,106 +1,94 @@
-const axios = require("axios");
-
 module.exports = {
-        config: {
-                name: "spamkick",
-                aliases: ["antispam"],
-                version: "1.7",
-                author: "MahMUD",
-                countDown: 5,
-                role: 0,
-                description: {
-                        bn: "গ্রুপে স্প্যামিং করলে ইউজারকে অটোমেটিক কিক দিন",
-                        en: "Auto kick users who spam messages in a group chat",
-                        vi: "Tự động kích người dùng spam tin nhắn trong nhóm"
-                },
-                category: "box chat",
-                guide: {
-                        bn: '   {pn} on/off: স্প্যাম কিক চালু বা বন্ধ করতে ব্যবহার করুন',
-                        en: '   {pn} on/off: Use to enable or disable spam kick',
-                        vi: '   {pn} on/off: Sử dụng để bật hoặc tắt tính năng kích spam'
-                }
-        },
+  config: {
+    name: "spamkick",
+    aliases: ["autokick"],
+    version: "1.0.1",
+    author: "DI-ABLO JI-SOO",
+    countDown: 0,
+    role: 2, // Bot Admin only
+    shortDescription: "Automatically kick users who spam emojis or stickers (more than 4 times)",
+    category: "admin",
+    guide: { en: "{p}spamkick [on/off]" }
+  },
 
-        langs: {
-                bn: {
-                        on: "✅ | এই গ্রুপে স্প্যাম কিক সিস্টেম চালু করা হয়েছে!",
-                        off: "❎ | এই গ্রুপে স্প্যাম কিক সিস্টেম বন্ধ করা হয়েছে!",
-                        notActive: "❎ | স্প্যাম কিক এই গ্রুপে আগে থেকেই বন্ধ আছে।",
-                        kickMsg: "🚫 | %1 কে স্প্যামিং করার জন্য গ্রুপ থেকে রিমুভ করা হয়েছে।\nইউজার আইডি: %2",
-                        error: "× সমস্যা হয়েছে: %1। প্রয়োজনে Contact MahMUD।"
-                },
-                en: {
-                        on: "✅ | Spam kick has been turned on for this group!",
-                        off: "❎ | Spam kick has been turned off for this thread.",
-                        notActive: "❎ | Spam kick is not active on this thread.",
-                        kickMsg: "🚫 | %1 has been removed for spamming.\nUser ID: %2",
-                        error: "× API error: %1. Contact MahMUD for help."
-                },
-                vi: {
-                        on: "✅ | Hệ thống kích spam đã được bật cho nhóm này!",
-                        off: "❎ | Hệ thống kích spam đã bị tắt cho nhóm này.",
-                        notActive: "❎ | Hệ thống kích spam không hoạt động trong nhóm này.",
-                        kickMsg: "🚫 | %1 đã bị xóa vì spam.\nID người dùng: %2",
-                        error: "× Lỗi: %1. Liên hệ MahMUD để hỗ trợ."
-                }
-        },
+  // ফেসবুক আইডি (UID)
+  adminUIDs: ["61591412309835"], 
 
-        onChat: async function ({ api, event, usersData, getLang }) {
-                const authorName = String.fromCharCode(77, 97, 104, 77, 85, 68);
-                if (this.config.author !== authorName) return;
+  // স্প্যাম ট্র্যাকিং মেমোরি
+  spamMap: new Map(),
 
-                const { senderID, threadID, messageID } = event;
-                if (!global.antispam) global.antispam = new Map();
-                if (!global.antispam.has(threadID)) return;
+  onStart: async function ({ api, event, message, args }) {
+    const senderID = event.senderID;
+    const sendMsg = (txt) => message && typeof message.reply === "function" ? message.reply(txt) : api.sendMessage(txt, event.threadID, event.messageID);
 
-                const threadInfo = global.antispam.get(threadID);
-                if (!(senderID in threadInfo.users)) {
-                        threadInfo.users[senderID] = { count: 1, time: Date.now() };
-                } else {
-                        threadInfo.users[senderID].count++;
-                        const timePassed = Date.now() - threadInfo.users[senderID].time;
-                        const messages = threadInfo.users[senderID].count;
-                        const timeLimit = 80000;
-                        const messageLimit = 14;
+    // সিকিউরিটি চেক: 
+    if (!this.adminUIDs.includes(senderID)) {
+      return sendMsg("❌ ᴏɴʟʏ ᴍʏ ʙᴏss ᴅɪ-ᴀʙʟᴏ ᴄᴀɴ ᴄᴏɴᴛʀᴏʟ sᴘᴀᴍᴋɪᴄᴋ sʏsᴛᴇᴍ!");
+    }
 
-                        if (messages > messageLimit && timePassed < timeLimit) {
-                                api.removeUserFromGroup(senderID, threadID, async (err) => {
-                                        if (err) return console.error(err);
-                                        const name = await usersData.getName(senderID);
-                                        api.sendMessage(getLang("kickMsg", name, senderID), threadID);
-                                });
-                                threadInfo.users[senderID] = { count: 1, time: Date.now() };
-                        } else if (timePassed > timeLimit) {
-                                threadInfo.users[senderID] = { count: 1, time: Date.now() };
-                        }
-                }
-                global.antispam.set(threadID, threadInfo);
-        },
+    const status = args[0]?.toLowerCase();
+    if (status === "on") {
+      global.spamKickActive = true;
+      return sendMsg("✅ ꜱᴘᴀᴍ ᴋɪᴄᴋ ꜱʏꜱᴛᴇᴍ ɪꜱ ɴᴏᴡ ᴀᴄᴛɪᴠᴀᴛᴇᴅ!");
+    } else if (status === "off") {
+      global.spamKickActive = false;
+      return sendMsg("❌ ꜱᴘᴀᴍ ᴋɪᴄᴋ ꜱʏꜱᴛᴇᴍ ɪꜱ ɴᴏᴡ ᴅᴇᴀᴄᴛɪᴠᴀᴛᴇᴅ!");
+    } else {
+      return sendMsg("❌ ᴜꜱᴀɢᴇ: #ꜱᴘᴀᴍᴋɪᴄᴋ [ᴏɴ/ᴏꜰꜰ]");
+    }
+  },
 
-        onStart: async function ({ api, event, args, message, getLang }) {
-                const authorName = String.fromCharCode(77, 97, 104, 77, 85, 68);
-                if (this.config.author !== authorName) {
-                        return api.sendMessage("You are not authorized to change the author name.", event.threadID, event.messageID);
-                }
+  handleEvent: async function ({ api, event }) {
+    if (global.spamKickActive === false) return;
 
-                if (!global.antispam) global.antispam = new Map();
-                const { threadID, messageID } = event;
+    const { threadID, senderID, body, type, messageID } = event;
 
-                switch (args[0]) {
-                        case "on":
-                                api.setMessageReaction("✅", messageID, () => {}, true);
-                                global.antispam.set(threadID, { users: {} });
-                                return message.reply(getLang("on"));
-                        case "off":
-                                api.setMessageReaction("❎", messageID, () => {}, true);
-                                if (global.antispam.has(threadID)) {
-                                        global.antispam.delete(threadID);
-                                        return message.reply(getLang("off"));
-                                } else {
-                                        return message.reply(getLang("notActive"));
-                                }
-                        default:
-                                return message.SyntaxError();
-                }
+    if (senderID === api.getCurrentUserID()) return;
+
+    try {
+      const threadInfo = await api.getThreadInfo(threadID);
+      const adminIDs = threadInfo.adminIDs.map(item => item.id);
+
+      // গ্রুপের অ্যাডমিনদের কিক করবে না
+      if (adminIDs.includes(senderID)) return;
+
+      const isSticker = type === "sticker" || event.attachments?.some(att => att.type === "sticker");
+      const emojiRegex = /^[\p{Extended_Pictographic}\s]+$/u;
+      const isOnlyEmoji = body && emojiRegex.test(body.trim());
+
+      if (isSticker || isOnlyEmoji) {
+        const userKey = `${threadID}_${senderID}`;
+        let userData = this.spamMap.get(userKey) || { count: 0, timer: null };
+
+        userData.count += 1;
+
+        if (userData.timer) clearTimeout(userData.timer);
+        userData.timer = setTimeout(() => {
+          this.spamMap.delete(userKey);
+        }, 5000);
+
+        this.spamMap.set(userKey, userData);
+
+        if (userData.count > 4) {
+          this.spamMap.delete(userKey);
+
+          const botID = api.getCurrentUserID();
+          const isBotAdmin = adminIDs.includes(botID);
+
+          if (!isBotAdmin) {
+            return api.sendMessage("⚠️ ꜱᴘᴀᴍ ᴅᴇᴛᴇᴄᴛᴇᴅ! ᴘʟᴇᴀꜱᴇ ᴍᴀᴋᴇ ᴍᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴋɪᴄᴋ ꜱᴘᴀᴍᴍᴇʀꜱ.", threadID, messageID);
+          }
+
+          // মেসেজ পুরো ইংরেজিতে আপডেট করা হয়েছে
+          await api.sendMessage("🚫 ⚠️ ꜱᴘᴀᴍ ᴅᴇᴛᴇᴄᴛᴇᴅ!\n\nᴜꜱᴇʀ ʜᴀꜱ ʙᴇᴇɴ ᴋɪᴄᴋᴇᴅ ꜰᴏʀ ꜱᴘᴀᴍᴍɪɴɢ ᴍᴏʀᴇ ᴛʜᴀɴ 4 ᴇᴍᴏᴊɪꜱ/ꜱᴛɪᴄᴋᴇʀꜱ.", threadID);
+          
+          api.removeUserFromGroup(senderID, threadID, (err) => {
+            if (err) console.error("Failed to kick user:", err);
+          });
         }
+      }
+    } catch (err) {
+      console.error("SpamKick Error:", err);
+    }
+  }
 };
