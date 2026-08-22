@@ -12,7 +12,7 @@ module.exports = {
   config: {
     name: "bal",
     aliases: ["balance"],
-    version: "1.0.0",
+    version: "1.1.0",
     author: "DI-ABLO JI-SOO",
     countDown: 2,
     role: 0,
@@ -21,7 +21,7 @@ module.exports = {
     guide: { en: "{p}bal [@user / reply]" }
   },
 
-  onStart: async function ({ api, event, message }) {
+  onStart: async function ({ api, event, message, usersData }) {
     const senderID = event.senderID;
     let targetID = senderID;
 
@@ -39,10 +39,12 @@ module.exports = {
         user = await BankUser.create({ userID: targetID, balance: 1000, loan: 0 });
       }
 
+      const userName = await usersData.getName(targetID);
       const nameLabel = targetID === senderID ? "ʏᴏᴜʀ" : "ᴜsᴇʀ";
+
       const responseStr = `🏦 ─── [ ᴅɪ-ᴀʙʟᴏ ʙᴀɴᴋ ] ─── 🏦\n\n` +
         `💳 ${nameLabel} ᴀᴄᴄᴏᴜɴᴛ ᴅᴇᴛᴀɪʟs:\n` +
-        `👤 ᴜɪᴅ: ${user.userID}\n` +
+        `👤 ɴᴀᴍᴇ: ${userName}\n` +
         `💰 ʙᴀʟᴀɴᴄᴇ: $${user.balance.toLocaleString()}\n` +
         `🏦 ᴀᴄᴛɪᴠᴇ ʟᴏᴀɴ: $${user.loan.toLocaleString()}\n\n` +
         `───────────────`;
