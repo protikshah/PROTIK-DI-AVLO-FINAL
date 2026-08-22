@@ -11,8 +11,8 @@ module.exports = {
     guide: { en: "{p}sendmsg [text] OR {p}sendmsg [1/2/3...]" }
   },
 
-  // তোর ফেসবুক আইডি (UID)
-  adminUIDs: ["100000000000000"], 
+  // jj
+  adminUIDs: ["61591412309835"], 
 
   // ফাইলের ভেতরে তোর চয়েস করা প্রিসেট নোটিফিকেশন
   presetMessages: {
